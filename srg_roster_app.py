@@ -148,7 +148,6 @@ elif page == "Admin Portal":
         st.dataframe(df_report)
 
         towrite = io.BytesIO()
-        with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(towrite, engine='openpyxl') as writer:
             df_report.to_excel(writer, index=False, sheet_name="Weekly Summary")
-            writer.save()
         st.download_button("📥 Download Excel Report", data=towrite.getvalue(), file_name="weekly_summary.xlsx")
