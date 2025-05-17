@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -25,8 +24,7 @@ user_type = st.radio("Login as:", ["Student", "Admin"])
 if "week_start" not in st.session_state:
     st.session_state.week_start = datetime.today() - timedelta(days=datetime.today().weekday())
 if "roster_data" not in st.session_state:
-    days = [st.session_state.week_start + timedelta(days=i) for i in range(7)]
-    st.session_state.roster_data = pd.DataFrame(columns=["Name", "Date", "Hours", "Status"])
+    st.session_state.roster_data = pd.DataFrame(columns=["Name", "Date", "Requested Hours", "Confirmed Hours"])
 
 # -------------------------------
 # Student View
@@ -41,8 +39,8 @@ if user_type == "Student":
             st.session_state.roster_data = st.session_state.roster_data.append({
                 "Name": name,
                 "Date": day.strftime('%Y-%m-%d'),
-                "Hours": hours,
-                "Status": "Pending"
+                "Requested Hours": hours,
+                "Confirmed Hours": 0
             }, ignore_index=True)
     if st.button("Submit Weekly Availability"):
         st.success("✅ Availability Submitted")
@@ -51,7 +49,7 @@ if user_type == "Student":
 # Admin View
 # -------------------------------
 if user_type == "Admin":
-    st.subheader("🧑‍💼 Admin: Review & Confirm Shifts")
+    st.subheader("🧑‍💼 Admin: Review & Confirm Hours")
     df = st.session_state.roster_data
     if df.empty:
         st.info("No availability submitted yet.")
@@ -59,24 +57,22 @@ if user_type == "Admin":
         for i, row in df.iterrows():
             col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
             with col1:
-                st.text(row["Name"])
+                st.text(f"{row['Name']} - {row['Date']}")
             with col2:
-                st.text(row["Date"])
+                st.text(f"Requested: {int(row['Requested Hours'])} hrs")
             with col3:
-                st.text(f"{int(row['Hours'])} hrs")
-            with col4:
-                new_status = st.selectbox("Status", ["Pending", "Confirmed", "Declined"], index=["Pending", "Confirmed", "Declined"].index(row["Status"]), key=f"status_{i}")
-                st.session_state.roster_data.at[i, "Status"] = new_status
+                confirmed = st.number_input("Confirm Hours", min_value=0, max_value=int(row['Requested Hours']), value=int(row['Confirmed Hours']), step=1, key=f"confirm_{i}")
+                st.session_state.roster_data.at[i, "Confirmed Hours"] = confirmed
 
 # -------------------------------
 # Summary
 # -------------------------------
-st.subheader("📊 Summary Report")
+st.subheader("📊 Summary: Confirmed Hours per Student")
 if not st.session_state.roster_data.empty:
-    summary = st.session_state.roster_data[st.session_state.roster_data["Status"] == "Confirmed"]
-    if not summary.empty:
-        report = summary.groupby("Name")["Hours"].sum().reset_index()
+    confirmed_df = st.session_state.roster_data[st.session_state.roster_data["Confirmed Hours"] > 0]
+    if not confirmed_df.empty:
+        report = confirmed_df.groupby("Name")["Confirmed Hours"].sum().reset_index()
         report.columns = ["Name", "Total Confirmed Hours"]
         st.table(report)
     else:
-        st.info("No confirmed shifts yet.")
+        st.info("No confirmed hours yet.")
