@@ -1,78 +1,103 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
-# -------------------------------
-# Authentication
-# -------------------------------
-st.set_page_config(page_title="SRG Roster Calendar", layout="wide")
-st.title("📅 SRG Weekly Roster Calendar")
+# Setup
+st.set_page_config(page_title="SRG Roster Manager", layout="wide")
+st.sidebar.title("📋 SRG Navigation")
+page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Admin Portal"])
 
-# Dummy login
-username = st.text_input("Username")
-password = st.text_input("Password", type="password")
+# Global state init
+if "users" not in st.session_state:
+    st.session_state.users = {}  # Format: {student_id: {"name": ..., "shifts": [...]}}
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
 
-if username != "demo" or password != "demo":
-    st.warning("Enter demo/demo to login")
-    st.stop()
+# Page 1: Home
+if page == "Home":
+    st.title("🏫 SRG Roster Management System")
+    st.markdown("Welcome to the Student Roster Management System. Please choose **Student Portal** or **Admin Portal** from the left sidebar.")
 
-user_type = st.radio("Login as:", ["Student", "Admin"])
+# Page 2: Student Portal
+elif page == "Student Portal":
+    st.title("🧑‍🎓 Student Login / Registration")
+    with st.form("student_login"):
+        student_id = st.text_input("Student ID")
+        student_name = st.text_input("Full Name")
+        submitted = st.form_submit_button("Login / Register")
 
-# -------------------------------
-# Initialize Roster Data
-# -------------------------------
-if "week_start" not in st.session_state:
-    st.session_state.week_start = datetime.today() - timedelta(days=datetime.today().weekday())
-if "roster_data" not in st.session_state:
-    st.session_state.roster_data = pd.DataFrame(columns=["Name", "Date", "Requested Hours", "Confirmed Hours"])
+        if submitted:
+            if student_id and student_name:
+                st.session_state.current_user = student_id
+                if student_id not in st.session_state.users:
+                    st.session_state.users[student_id] = {"name": student_name, "shifts": []}
+                st.success(f"Logged in as {student_name} (ID: {student_id})")
+            else:
+                st.warning("Please enter both ID and name.")
 
-# -------------------------------
-# Student View
-# -------------------------------
-if user_type == "Student":
-    st.subheader("🧑‍🎓 Submit Your Weekly Availability")
-    name = st.text_input("Your Name")
-    for i in range(7):
-        day = st.session_state.week_start + timedelta(days=i)
-        hours = st.number_input(f"{day.strftime('%A (%d %b)')}", min_value=0, max_value=12, value=0, step=1, key=f"student_{i}")
-        if hours > 0 and name:
-            st.session_state.roster_data = st.session_state.roster_data.append({
-                "Name": name,
-                "Date": day.strftime('%Y-%m-%d'),
-                "Requested Hours": hours,
-                "Confirmed Hours": 0
-            }, ignore_index=True)
-    if st.button("Submit Weekly Availability"):
-        st.success("✅ Availability Submitted")
+    if st.session_state.current_user:
+        st.subheader("📅 Enter Your Weekly Availability with Time")
+        today = datetime.today()
+        week_start = today - timedelta(days=today.weekday())
+        shifts = []
 
-# -------------------------------
-# Admin View
-# -------------------------------
-if user_type == "Admin":
-    st.subheader("🧑‍💼 Admin: Review & Confirm Hours")
-    df = st.session_state.roster_data
-    if df.empty:
-        st.info("No availability submitted yet.")
-    else:
-        for i, row in df.iterrows():
-            col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+        for i in range(7):
+            day = week_start + timedelta(days=i)
+            st.markdown(f"**{day.strftime('%A (%d %b)')}**")
+            col1, col2 = st.columns(2)
             with col1:
-                st.text(f"{row['Name']} - {row['Date']}")
+                start_time = st.time_input(f"Start Time - {day.strftime('%A')}", value=time(9, 0), key=f"start_{i}")
             with col2:
-                st.text(f"Requested: {int(row['Requested Hours'])} hrs")
-            with col3:
-                confirmed = st.number_input("Confirm Hours", min_value=0, max_value=int(row['Requested Hours']), value=int(row['Confirmed Hours']), step=1, key=f"confirm_{i}")
-                st.session_state.roster_data.at[i, "Confirmed Hours"] = confirmed
+                end_time = st.time_input(f"End Time - {day.strftime('%A')}", value=time(17, 0), key=f"end_{i}")
+            if start_time < end_time:
+                shifts.append({
+                    "date": day.strftime("%Y-%m-%d"),
+                    "day": day.strftime("%A"),
+                    "start": str(start_time),
+                    "end": str(end_time),
+                    "status": "Pending"
+                })
 
-# -------------------------------
-# Summary
-# -------------------------------
-st.subheader("📊 Summary: Confirmed Hours per Student")
-if not st.session_state.roster_data.empty:
-    confirmed_df = st.session_state.roster_data[st.session_state.roster_data["Confirmed Hours"] > 0]
-    if not confirmed_df.empty:
-        report = confirmed_df.groupby("Name")["Confirmed Hours"].sum().reset_index()
-        report.columns = ["Name", "Total Confirmed Hours"]
-        st.table(report)
-    else:
-        st.info("No confirmed hours yet.")
+        if st.button("Submit Weekly Shifts"):
+            st.session_state.users[st.session_state.current_user]["shifts"] = shifts
+            st.success("✅ Shifts submitted successfully!")
+
+        # Show existing shifts
+        if st.session_state.users[st.session_state.current_user]["shifts"]:
+            st.subheader("📌 Submitted Shifts")
+            st.table(pd.DataFrame(st.session_state.users[st.session_state.current_user]["shifts"]))
+
+# Page 3: Admin Portal
+elif page == "Admin Portal":
+    st.title("🧑‍💼 Admin Login")
+    if not st.session_state.admin_logged_in:
+        admin_user = st.text_input("Username")
+        admin_pass = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if admin_user == "demo" and admin_pass == "demo":
+                st.session_state.admin_logged_in = True
+                st.success("✅ Logged in as Admin")
+            else:
+                st.error("❌ Invalid credentials")
+
+    if st.session_state.admin_logged_in:
+        st.subheader("📋 All Student Shifts")
+        for student_id, data in st.session_state.users.items():
+            st.markdown(f"### {data['name']} (ID: {student_id})")
+            if data["shifts"]:
+                df = pd.DataFrame(data["shifts"])
+                for i in range(len(df)):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(f"**{df.loc[i, 'day']} - {df.loc[i, 'date']}**: {df.loc[i, 'start']} to {df.loc[i, 'end']}")
+                    with col2:
+                        new_status = st.selectbox("Status", ["Pending", "Confirmed", "Declined"],
+                                                  index=["Pending", "Confirmed", "Declined"].index(df.loc[i, "status"]),
+                                                  key=f"status_{student_id}_{i}")
+                        df.at[i, "status"] = new_status
+                st.session_state.users[student_id]["shifts"] = df.to_dict(orient="records")
+                st.markdown("---")
+            else:
+                st.info("No shifts submitted.")
