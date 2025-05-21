@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
@@ -9,7 +10,7 @@ page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Admin Portal"])
 
 # Global state init
 if "users" not in st.session_state:
-    st.session_state.users = {}  # Format: {student_id: {"name": ..., "shifts": [...]}}
+    st.session_state.users = {}  # Format: {student_id: {"name": ..., "shifts": []}}
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "current_user" not in st.session_state:
@@ -86,18 +87,42 @@ elif page == "Admin Portal":
         st.subheader("📋 All Student Shifts")
         for student_id, data in st.session_state.users.items():
             st.markdown(f"### {data['name']} (ID: {student_id})")
-            if data["shifts"]:
+            if isinstance(data["shifts"], list) and data["shifts"]:
                 df = pd.DataFrame(data["shifts"])
                 for i in range(len(df)):
                     col1, col2 = st.columns(2)
                     with col1:
                         st.markdown(f"**{df.loc[i, 'day']} - {df.loc[i, 'date']}**: {df.loc[i, 'start']} to {df.loc[i, 'end']}")
                     with col2:
+                        color_label = {
+                            "Pending": "🟨 Pending",
+                            "Confirmed": "🟩 Confirmed",
+                            "Declined": "🟥 Declined"
+                        }
                         new_status = st.selectbox("Status", ["Pending", "Confirmed", "Declined"],
                                                   index=["Pending", "Confirmed", "Declined"].index(df.loc[i, "status"]),
-                                                  key=f"status_{student_id}_{i}")
+                                                  key=f"status_{student_id}_{i}",
+                                                  format_func=lambda x: color_label[x])
                         df.at[i, "status"] = new_status
                 st.session_state.users[student_id]["shifts"] = df.to_dict(orient="records")
                 st.markdown("---")
             else:
                 st.info("No shifts submitted.")
+
+        st.subheader("📊 Weekly Summary Report")
+        summary = []
+        for student_id, data in st.session_state.users.items():
+            total_hours = 0
+            for shift in data["shifts"]:
+                if shift["status"] == "Confirmed":
+                    start = datetime.strptime(shift["start"], "%H:%M:%S")
+                    end = datetime.strptime(shift["end"], "%H:%M:%S")
+                    hours = (end - start).seconds / 3600
+                    total_hours += hours
+            summary.append({
+                "Student ID": student_id,
+                "Name": data["name"],
+                "Confirmed Hours": total_hours
+            })
+
+        st.table(pd.DataFrame(summary))
