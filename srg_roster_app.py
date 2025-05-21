@@ -4,12 +4,10 @@ import pandas as pd
 from datetime import datetime, timedelta, time
 from streamlit_calendar import calendar
 
-# Setup
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
 st.sidebar.title("📋 SRG Navigation")
 page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Admin Portal"])
 
-# Global state init
 if "users" not in st.session_state:
     st.session_state.users = {}
 if "admin_logged_in" not in st.session_state:
@@ -17,34 +15,30 @@ if "admin_logged_in" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
-# Page 1: Home
 if page == "Home":
     st.title("🏫 SRG Roster Management System")
-    st.markdown("Welcome to the Student Roster Management System. Please choose **Student Portal** or **Admin Portal** from the left sidebar.")
+    st.markdown("Choose **Student Portal** or **Admin Portal** from the sidebar.")
 
-# Page 2: Student Portal
 elif page == "Student Portal":
     st.title("🧑‍🎓 Student Login / Registration")
     with st.form("student_login"):
         student_id = st.text_input("Student ID")
         student_name = st.text_input("Full Name")
         submitted = st.form_submit_button("Login / Register")
-
         if submitted:
             if student_id and student_name:
                 st.session_state.current_user = student_id
                 if student_id not in st.session_state.users:
                     st.session_state.users[student_id] = {"name": student_name, "shifts": []}
-                st.success(f"Logged in as {student_name} (ID: {student_id})")
+                st.success(f"Logged in as {student_name}")
             else:
-                st.warning("Please enter both ID and name.")
+                st.warning("Enter both ID and Name.")
 
     if st.session_state.current_user:
-        st.subheader("📅 Enter Your Weekly Availability with Time")
+        st.subheader("📅 Enter Weekly Availability")
         today = datetime.today()
         week_start = today - timedelta(days=today.weekday())
         shifts = []
-
         for i in range(7):
             day = week_start + timedelta(days=i)
             st.markdown(f"**{day.strftime('%A (%d %b)')}**")
@@ -61,23 +55,21 @@ elif page == "Student Portal":
                     "end": str(end_time),
                     "status": "Pending"
                 })
-
         if st.button("Submit Weekly Shifts"):
             st.session_state.users[st.session_state.current_user]["shifts"] = shifts
-            st.success("✅ Shifts submitted successfully!")
+            st.success("Shifts submitted!")
 
-        # Show calendar for student
         student_data = st.session_state.users[st.session_state.current_user]
         events = [
             {
-                "title": f"{student_data['name']} ({shift['status']})",
+                "title": student_data["name"],
                 "start": f"{shift['date']}T{shift['start']}",
                 "end": f"{shift['date']}T{shift['end']}",
                 "extendedProps": {
-                    "name": student_data["name"],
                     "status": shift["status"],
                     "start_time": shift["start"],
-                    "end_time": shift["end"]
+                    "end_time": shift["end"],
+                    "date": shift["date"]
                 }
             }
             for shift in student_data["shifts"]
@@ -85,7 +77,6 @@ elif page == "Student Portal":
         st.subheader("📆 My Calendar View")
         calendar(events=events, options={"initialView": "dayGridMonth"})
 
-# Page 3: Admin Portal
 elif page == "Admin Portal":
     st.title("🧑‍💼 Admin Login")
     if not st.session_state.admin_logged_in:
@@ -94,12 +85,12 @@ elif page == "Admin Portal":
         if st.button("Login"):
             if admin_user == "demo" and admin_pass == "demo":
                 st.session_state.admin_logged_in = True
-                st.success("✅ Logged in as Admin")
+                st.success("Admin logged in")
             else:
-                st.error("❌ Invalid credentials")
+                st.error("Invalid credentials")
 
     if st.session_state.admin_logged_in:
-        st.subheader("📋 All Student Shifts")
+        st.subheader("📋 Manage Shifts")
         for student_id, data in st.session_state.users.items():
             st.markdown(f"### {data['name']} (ID: {student_id})")
             if isinstance(data["shifts"], list) and data["shifts"]:
@@ -107,56 +98,66 @@ elif page == "Admin Portal":
                 for i in range(len(df)):
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.markdown(f"**{df.loc[i, 'day']} - {df.loc[i, 'date']}**: {df.loc[i, 'start']} to {df.loc[i, 'end']}")
+                        st.markdown(f"{df.loc[i, 'day']} - {df.loc[i, 'date']}: {df.loc[i, 'start']} to {df.loc[i, 'end']}")
                     with col2:
-                        color_label = {
-                            "Pending": "🟨 Pending",
-                            "Confirmed": "🟩 Confirmed",
-                            "Declined": "🟥 Declined"
-                        }
                         new_status = st.selectbox("Status", ["Pending", "Confirmed", "Declined"],
-                                                  index=["Pending", "Confirmed", "Declined"].index(df.loc[i, "status"]),
-                                                  key=f"status_{student_id}_{i}",
-                                                  format_func=lambda x: color_label[x])
+                            index=["Pending", "Confirmed", "Declined"].index(df.loc[i, "status"]),
+                            key=f"status_{student_id}_{i}")
                         df.at[i, "status"] = new_status
                 st.session_state.users[student_id]["shifts"] = df.to_dict(orient="records")
-                st.markdown("---")
             else:
                 st.info("No shifts submitted.")
 
-        # Admin calendar view
-        st.subheader("📆 Full Calendar View")
+        st.subheader("📆 All Shifts on Calendar")
         all_events = []
         for student_id, data in st.session_state.users.items():
             for shift in data["shifts"]:
                 all_events.append({
-                    "title": f"{data['name']} ({shift['status']})",
+                    "title": data["name"],
                     "start": f"{shift['date']}T{shift['start']}",
                     "end": f"{shift['date']}T{shift['end']}",
                     "extendedProps": {
+                        "student_id": student_id,
                         "name": data["name"],
                         "status": shift["status"],
                         "start_time": shift["start"],
-                        "end_time": shift["end"]
+                        "end_time": shift["end"],
+                        "date": shift["date"]
                     }
                 })
         calendar(events=all_events, options={"initialView": "dayGridMonth"})
 
-        # Summary
         st.subheader("📊 Weekly Summary Report")
-        summary = []
+
+        records = []
         for student_id, data in st.session_state.users.items():
-            total_hours = 0
             for shift in data["shifts"]:
                 if shift["status"] == "Confirmed":
                     start = datetime.strptime(shift["start"], "%H:%M:%S")
                     end = datetime.strptime(shift["end"], "%H:%M:%S")
                     hours = (end - start).seconds / 3600
-                    total_hours += hours
-            summary.append({
-                "Student ID": student_id,
-                "Name": data["name"],
-                "Confirmed Hours": total_hours
-            })
+                    records.append({
+                        "Student ID": student_id,
+                        "Name": data["name"],
+                        "Date": shift["date"],
+                        "Day": shift["day"],
+                        "Start Time": shift["start"],
+                        "End Time": shift["end"],
+                        "Status": shift["status"],
+                        "Hours": hours
+                    })
 
-        st.table(pd.DataFrame(summary))
+        df_summary = pd.DataFrame(records)
+        st.dataframe(df_summary)
+
+        if not df_summary.empty:
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+                df_summary.to_excel(writer, index=False, sheet_name="Weekly Summary")
+                writer.save()
+                st.download_button(
+                    label="📥 Download Excel Summary",
+                    data=buffer.getvalue(),
+                    file_name="weekly_summary.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
