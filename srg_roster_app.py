@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
+from streamlit_calendar import calendar
 
 # Setup
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
@@ -65,10 +66,23 @@ elif page == "Student Portal":
             st.session_state.users[st.session_state.current_user]["shifts"] = shifts
             st.success("✅ Shifts submitted successfully!")
 
-        # Show existing shifts
+        # Show existing shifts in table
         if st.session_state.users[st.session_state.current_user]["shifts"]:
             st.subheader("📌 Submitted Shifts")
             st.table(pd.DataFrame(st.session_state.users[st.session_state.current_user]["shifts"]))
+
+        # Show existing shifts in calendar
+        student_data = st.session_state.users[st.session_state.current_user]
+        events = [
+            {
+                "title": f"{shift['day']} {shift['start']}–{shift['end']} ({shift['status']})",
+                "start": f"{shift['date']}T{shift['start']}",
+                "end": f"{shift['date']}T{shift['end']}"
+            }
+            for shift in student_data["shifts"]
+        ]
+        st.subheader("📆 My Calendar View")
+        calendar(events=events, options={"initialView": "dayGridMonth"})
 
 # Page 3: Admin Portal
 elif page == "Admin Portal":
@@ -109,6 +123,19 @@ elif page == "Admin Portal":
             else:
                 st.info("No shifts submitted.")
 
+        # Admin calendar view
+        st.subheader("📆 Full Calendar View")
+        all_events = []
+        for student_id, data in st.session_state.users.items():
+            for shift in data["shifts"]:
+                all_events.append({
+                    "title": f"{data['name']} ({shift['start']}–{shift['end']}) [{shift['status']}]",
+                    "start": f"{shift['date']}T{shift['start']}",
+                    "end": f"{shift['date']}T{shift['end']}"
+                })
+        calendar(events=all_events, options={"initialView": "dayGridMonth"})
+
+        # Summary report
         st.subheader("📊 Weekly Summary Report")
         summary = []
         for student_id, data in st.session_state.users.items():
