@@ -11,7 +11,7 @@ page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Admin Portal"])
 
 # Global state init
 if "users" not in st.session_state:
-    st.session_state.users = {}  # Format: {student_id: {"name": ..., "shifts": []}}
+    st.session_state.users = {}
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "current_user" not in st.session_state:
@@ -66,22 +66,18 @@ elif page == "Student Portal":
             st.session_state.users[st.session_state.current_user]["shifts"] = shifts
             st.success("✅ Shifts submitted successfully!")
 
-        # Show existing shifts in table
-        if st.session_state.users[st.session_state.current_user]["shifts"]:
-            st.subheader("📌 Submitted Shifts")
-            st.table(pd.DataFrame(st.session_state.users[st.session_state.current_user]["shifts"]))
-
-        # Student calendar view
+        # Show calendar for student
         student_data = st.session_state.users[st.session_state.current_user]
         events = [
             {
-                "title": student_data['name'],
+                "title": f"{student_data['name']} ({shift['status']})",
                 "start": f"{shift['date']}T{shift['start']}",
                 "end": f"{shift['date']}T{shift['end']}",
                 "extendedProps": {
-                    "status": shift['status'],
-                    "start_time": shift['start'],
-                    "end_time": shift['end']
+                    "name": student_data["name"],
+                    "status": shift["status"],
+                    "start_time": shift["start"],
+                    "end_time": shift["end"]
                 }
             }
             for shift in student_data["shifts"]
@@ -134,10 +130,11 @@ elif page == "Admin Portal":
         for student_id, data in st.session_state.users.items():
             for shift in data["shifts"]:
                 all_events.append({
-                    "title": data["name"],
+                    "title": f"{data['name']} ({shift['status']})",
                     "start": f"{shift['date']}T{shift['start']}",
                     "end": f"{shift['date']}T{shift['end']}",
                     "extendedProps": {
+                        "name": data["name"],
                         "status": shift["status"],
                         "start_time": shift["start"],
                         "end_time": shift["end"]
@@ -145,7 +142,7 @@ elif page == "Admin Portal":
                 })
         calendar(events=all_events, options={"initialView": "dayGridMonth"})
 
-        # Summary report
+        # Summary
         st.subheader("📊 Weekly Summary Report")
         summary = []
         for student_id, data in st.session_state.users.items():
