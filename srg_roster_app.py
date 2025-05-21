@@ -1,93 +1,78 @@
-
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta, time
-import io
+from datetime import datetime, timedelta
 
-st.set_page_config(page_title="SRG Roster Management", layout="wide")
+# -------------------------------
+# Authentication
+# -------------------------------
+st.set_page_config(page_title="SRG Roster Calendar", layout="wide")
+st.title("📅 SRG Weekly Roster Calendar")
 
-# Constants
-DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-HOURS = list(range(9, 18))  # 9AM–5PM
+# Dummy login
+username = st.text_input("Username")
+password = st.text_input("Password", type="password")
 
-# Session state initialization
-if "users" not in st.session_state:
-    st.session_state.users = {}  # {student_id: {"name": ..., "shifts": {(day, hour): "Available"/"Confirmed"}}}
-if "admin_logged_in" not in st.session_state:
-    st.session_state.admin_logged_in = False
-if "current_user" not in st.session_state:
-    st.session_state.current_user = None
+if username != "demo" or password != "demo":
+    st.warning("Enter demo/demo to login")
+    st.stop()
 
-# Sidebar login
-st.sidebar.title("SRG Login")
-login_role = st.sidebar.radio("Login as", ["Student", "Admin"])
+user_type = st.radio("Login as:", ["Student", "Admin"])
 
-if login_role == "Student":
-    sid = st.sidebar.text_input("Student ID")
-    name = st.sidebar.text_input("Full Name")
-    if st.sidebar.button("Login / Register"):
-        if sid and name:
-            st.session_state.current_user = sid
-            if sid not in st.session_state.users:
-                st.session_state.users[sid] = {"name": name, "shifts": {}}
-            st.success(f"Logged in as {name}")
+# -------------------------------
+# Initialize Roster Data
+# -------------------------------
+if "week_start" not in st.session_state:
+    st.session_state.week_start = datetime.today() - timedelta(days=datetime.today().weekday())
+if "roster_data" not in st.session_state:
+    st.session_state.roster_data = pd.DataFrame(columns=["Name", "Date", "Requested Hours", "Confirmed Hours"])
 
-elif login_role == "Admin":
-    admin_user = st.sidebar.text_input("Username")
-    admin_pass = st.sidebar.text_input("Password", type="password")
-    if st.sidebar.button("Login as Admin"):
-        if admin_user == "demo" and admin_pass == "demo":
-            st.session_state.admin_logged_in = True
-            st.success("Admin logged in")
-        else:
-            st.error("Invalid admin credentials")
+# -------------------------------
+# Student View
+# -------------------------------
+if user_type == "Student":
+    st.subheader("🧑‍🎓 Submit Your Weekly Availability")
+    name = st.text_input("Your Name")
+    for i in range(7):
+        day = st.session_state.week_start + timedelta(days=i)
+        hours = st.number_input(f"{day.strftime('%A (%d %b)')}", min_value=0, max_value=12, value=0, step=1, key=f"student_{i}")
+        if hours > 0 and name:
+            st.session_state.roster_data = st.session_state.roster_data.append({
+                "Name": name,
+                "Date": day.strftime('%Y-%m-%d'),
+                "Requested Hours": hours,
+                "Confirmed Hours": 0
+            }, ignore_index=True)
+    if st.button("Submit Weekly Availability"):
+        st.success("✅ Availability Submitted")
 
-# Student view
-if st.session_state.current_user:
-    user_id = st.session_state.current_user
-    user_data = st.session_state.users[user_id]
-    st.title(f"🧑‍🎓 SRG Weekly Availability for {user_data['name']}")
+# -------------------------------
+# Admin View
+# -------------------------------
+if user_type == "Admin":
+    st.subheader("🧑‍💼 Admin: Review & Confirm Hours")
+    df = st.session_state.roster_data
+    if df.empty:
+        st.info("No availability submitted yet.")
+    else:
+        for i, row in df.iterrows():
+            col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+            with col1:
+                st.text(f"{row['Name']} - {row['Date']}")
+            with col2:
+                st.text(f"Requested: {int(row['Requested Hours'])} hrs")
+            with col3:
+                confirmed = st.number_input("Confirm Hours", min_value=0, max_value=int(row['Requested Hours']), value=int(row['Confirmed Hours']), step=1, key=f"confirm_{i}")
+                st.session_state.roster_data.at[i, "Confirmed Hours"] = confirmed
 
-    for hour in HOURS:
-        cols = st.columns(len(DAYS))
-        for i, day in enumerate(DAYS):
-            key = f"{user_id}_{day}_{hour}"
-            status = user_data["shifts"].get((day, hour), "")
-            if status == "Confirmed":
-                cols[i].success("✔️ Confirmed")
-            elif status == "Available":
-                if cols[i].button("🟨 Pending", key=key):
-                    del user_data["shifts"][(day, hour)]
-                else:
-                    cols[i].info("⏳ Available")
-            else:
-                if cols[i].button(f"{day} {hour}:00", key=key):
-                    user_data["shifts"][(day, hour)] = "Available"
-
-# Admin view
-elif st.session_state.admin_logged_in:
-    st.title("🧑‍🏫 Admin Panel - Confirm Shifts")
-
-    for sid, data in st.session_state.users.items():
-        st.subheader(f"{data['name']} (ID: {sid})")
-        for hour in HOURS:
-            cols = st.columns(len(DAYS))
-            for i, day in enumerate(DAYS):
-                key = f"admin_{sid}_{day}_{hour}"
-                status = data["shifts"].get((day, hour), "")
-                if status == "Available":
-                    if cols[i].button("Confirm", key=key):
-                        data["shifts"][(day, hour)] = "Confirmed"
-                elif status == "Confirmed":
-                    cols[i].success("✔️")
-                else:
-                    cols[i].write("—")
-
-    # Weekly summary
-    st.subheader("📊 Weekly Hours Summary")
-    summary_data = []
-    for sid, data in st.session_state.users.items():
-        total_hours = sum(1 for v in data["shifts"].values() if v == "Confirmed")
-        summary_data.append({"Student ID": sid, "Name": data["name"], "Confirmed Hours": total_hours})
-    df_summary = pd.DataFrame(summary_data)
-    st.table(df_summary)
+# -------------------------------
+# Summary
+# -------------------------------
+st.subheader("📊 Summary: Confirmed Hours per Student")
+if not st.session_state.roster_data.empty:
+    confirmed_df = st.session_state.roster_data[st.session_state.roster_data["Confirmed Hours"] > 0]
+    if not confirmed_df.empty:
+        report = confirmed_df.groupby("Name")["Confirmed Hours"].sum().reset_index()
+        report.columns = ["Name", "Total Confirmed Hours"]
+        st.table(report)
+    else:
+        st.info("No confirmed hours yet.")
