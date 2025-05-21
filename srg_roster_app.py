@@ -58,7 +58,7 @@ st.markdown("""
             padding: 2rem 3rem;
         }
     </style>
-""", unsafe_allow_html=True)
+"""
 
 st.sidebar.title("📋 SRG Navigation")
 page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Lecturer Login"])
