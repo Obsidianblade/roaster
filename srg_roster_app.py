@@ -46,7 +46,7 @@ set_background("VUCOVER.png")
 st.markdown("""
     <style>
         .css-1r6slb0, .css-12oz5g7, .stDataFrame {
-            background: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.85);
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             padding: 1rem;
@@ -74,11 +74,7 @@ if "admin_logged_in" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
-status_colors = {
-    "Confirmed": "#28a745",
-    "To Be Attend": "#ffc107",
-    "Declined": "#dc3545"
-}
+status_colors = {"Confirmed": "#28a745", "To Be Attend": "#ffc107", "Declined": "#dc3545"}
 
 time_options = get_time_options()
 
@@ -90,7 +86,6 @@ if page == "Home":
 # --- Student Portal ---
 elif page == "Student Portal":
     st.title("🧑‍🎓 Student Portal")
-    # Login / Logout
     if st.session_state.current_user:
         st.success(f"Logged in as {st.session_state.users[st.session_state.current_user]['name']}")
         if st.button("Logout"):
@@ -109,7 +104,6 @@ elif page == "Student Portal":
                     st.experimental_rerun()
                 else:
                     st.warning("Enter both ID and Name.")
-    # Availability & Calendar
     if st.session_state.current_user:
         st.subheader("📅 Enter Weekly Availability")
         today = datetime.today()
@@ -127,27 +121,15 @@ elif page == "Student Portal":
                 s = datetime.strptime(st.session_state[f"start_{i}"], "%I:%M %p").time()
                 e = datetime.strptime(st.session_state[f"end_{i}"], "%I:%M %p").time()
                 if s < e:
-                    shifts.append({
-                        "date": day.strftime("%Y-%m-%d"),
-                        "day": day.strftime("%A"),
-                        "start": s.strftime("%H:%M:%S"),
-                        "end": e.strftime("%H:%M:%S"),
-                        "display": f"{st.session_state[f'start_{i}']}–{st.session_state[f'end_{i}']}",
-                        "status": "To Be Attend"
-                    })
+                    shifts.append({"date": day.strftime("%Y-%m-%d"), "day": day.strftime("%A"), "start": s.strftime("%H:%M:%S"), "end": e.strftime("%H:%M:%S"), "display": f"{st.session_state[f'start_{i}']}–{st.session_state[f'end_{i}']}", "status": "To Be Attend"})
                 else:
                     st.warning("End time must be after start time")
         if st.button("Submit Shifts"):
             st.session_state.users[st.session_state.current_user]["shifts"] = shifts
             st.success("Submitted!")
-        # Student Calendar
+        # Student calendar
         events = [
-            {
-                "title": st.session_state.users[st.session_state.current_user]["name"],
-                "start": f"{sh['date']}T{sh['start']}",
-                "end":   f"{sh['date']}T{sh['end']}",
-                "color": status_colors[sh["status"]]
-            } for sh in st.session_state.users[st.session_state.current_user]["shifts"]
+            {"title": st.session_state.users[st.session_state.current_user]["name"], "start": f"{sh['date']}T{sh['start']}", "end": f"{sh['date']}T{sh['end']}", "color": status_colors[sh['status']]} for sh in st.session_state.users[st.session_state.current_user]["shifts"]
         ]
         st.subheader("📆 My Schedule")
         calendar(events=events, options={"initialView": "dayGridWeek"})
@@ -155,7 +137,6 @@ elif page == "Student Portal":
 # --- Lecturer Portal ---
 elif page == "Lecturer Portal":
     st.title("👩‍🏫 Lecturer Portal")
-    # Login / Logout
     if not st.session_state.admin_logged_in:
         user = st.text_input("Username", key="admin_user")
         pwd  = st.text_input("Password", type="password", key="admin_pass")
@@ -171,7 +152,7 @@ elif page == "Lecturer Portal":
             st.session_state.admin_logged_in = False
             st.experimental_rerun()
 
-        # Tabs: Manage Shifts, Calendar View, Reports
+        # Tabs
         tab1, tab2, tab3 = st.tabs(["Manage Shifts","Calendar View","Reports"])
 
         with tab1:
@@ -186,14 +167,9 @@ elif page == "Lecturer Portal":
                                 date_fmt = datetime.strptime(df.loc[i,"date"],"%Y-%m-%d").strftime("%d %b %Y")
                                 st.write(f"**{df.loc[i,'day']} ({date_fmt})**")
                             with col2:
-                                st.write(f"{df.loc[i,'display']}")
+                                st.write(df.loc[i,'display'])
                             with col3:
-                                new_status = st.selectbox(
-                                    "Status",
-                                    ["To Be Attend","Confirmed","Declined"],
-                                    index=["To Be Attend","Confirmed","Declined"].index(df.loc[i,"status"]),
-                                    key=f"status_{sid}_{i}"
-                                )
+                                new_status = st.selectbox("Status", ["To Be Attend","Confirmed","Declined"], index=["To Be Attend","Confirmed","Declined"].index(df.loc[i,"status"]), key=f"status_{sid}_{i}")
                                 df.at[i,"status"] = new_status
                         st.session_state.users[sid]["shifts"] = df.to_dict("records")
                     else:
@@ -208,9 +184,11 @@ elif page == "Lecturer Portal":
                         "title": f"{data['name']} ({sh['display']})",
                         "start": f"{sh['date']}T{sh['start']}",
                         "end":   f"{sh['date']}T{sh['end']}",
-                        "color": status_colors[sh["status"]]
-                    })
+                        "color": status_colors[sh['status']]})
+            # Wrap calendar in white container for visibility
+            st.markdown('<div style="background: rgba(255,255,255,0.9); padding: 1rem; border-radius: 8px;">', unsafe_allow_html=True)
             calendar(events=all_events, options={"initialView":"dayGridMonth"})
+            st.markdown('</div>', unsafe_allow_html=True)
 
         with tab3:
             st.subheader("📊 Confirmed Shifts Report")
@@ -218,10 +196,7 @@ elif page == "Lecturer Portal":
             for sid, data in st.session_state.users.items():
                 for sh in data.get("shifts", []):
                     if sh["status"] == "Confirmed":
-                        hrs = round(
-                            (datetime.strptime(sh["end"], "%H:%M:%S") -
-                             datetime.strptime(sh["start"], "%H:%M:%S")
-                            ).seconds/3600, 2)
+                        hrs = round((datetime.strptime(sh["end"], "%H:%M:%S") - datetime.strptime(sh["start"], "%H:%M:%S")).seconds/3600, 2)
                         records.append({
                             "Student ID": sid,
                             "Name": data["name"],
@@ -231,29 +206,17 @@ elif page == "Lecturer Portal":
                             "Hours": hrs
                         })
             df = pd.DataFrame(records)
-
             if not df.empty:
                 st.dataframe(df, use_container_width=True)
                 st.metric("Total Confirmed Hours", f"{df['Hours'].sum():.2f}")
-
-                # Prepare Excel download
                 buf = BytesIO()
                 with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
                     df.to_excel(writer, sheet_name="Weekly Summary", index=False)
                     wb = writer.book
                     ws = writer.sheets["Weekly Summary"]
-                    header_fmt = wb.add_format({
-                        "bold": True, "bg_color": "#0066cc",
-                        "font_color": "white", "border": 1
-                    })
+                    header_fmt = wb.add_format({"bold": True, "bg_color": "#0066cc", "font_color": "white", "border": 1})
                     for col_num, col_name in enumerate(df.columns):
                         ws.write(0, col_num, col_name, header_fmt)
-
-                st.download_button(
-                    label="📥 Download Excel Summary",
-                    data=buf.getvalue(),
-                    file_name="SRG_weekly_summary.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                st.download_button(label="📥 Download Excel Summary", data=buf.getvalue(), file_name="SRG_weekly_summary.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             else:
                 st.info("No confirmed shifts to display.")
