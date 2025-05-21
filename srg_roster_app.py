@@ -337,6 +337,28 @@ elif page == "Student Portal":
             # Display total hours
             st.metric("Total Confirmed Hours", f"{total_hours:.2f}")
             
+            # Fix for the calendar display issue - make sure it renders properly
+            st.markdown("""
+            <style>
+            /* Critical fix for calendar display */
+            .fc-view-harness {
+                height: 600px !important;
+                min-height: 500px !important;
+            }
+            .fc-scrollgrid-sync-inner {
+                background-color: #f8f9fa;
+            }
+            .fc-col-header-cell {
+                background-color: #0066cc;
+                color: white;
+            }
+            .fc-col-header-cell a {
+                color: white !important;
+                font-weight: bold;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             # Display calendar with the selected view
             calendar_options = {
                 "initialView": calendar_view_map[calendar_view],
@@ -352,10 +374,17 @@ elif page == "Student Portal":
                     "omitZeroMinute": False,
                     "meridiem": "short"
                 },
-                "allDaySlot": False
+                "allDaySlot": False,
+                "height": 600,
+                "expandRows": True,
+                "stickyHeaderDates": True
             }
             
-            calendar(events=events, options=calendar_options)
+            try:
+                calendar(events=events, options=calendar_options, key="student_calendar")
+            except Exception as e:
+                st.error(f"Error loading calendar: {e}")
+                st.info("Try submitting some shifts first to see your calendar.")
         
         with student_tabs[2]:
             st.subheader("🏆 My Certificate")
@@ -508,7 +537,26 @@ elif page == "Lecturer Login":
                         }
                     })
             
-            # Display calendar with advanced options
+            # Add dummy event if no events are available to ensure calendar renders
+            if not all_events:
+                today = datetime.today()
+                tomorrow = today + timedelta(days=1)
+                all_events.append({
+                    "title": "Demo Event (9:00 AM - 5:00 PM)",
+                    "start": f"{today.strftime('%Y-%m-%d')}T09:00:00",
+                    "end": f"{today.strftime('%Y-%m-%d')}T17:00:00",
+                    "color": "#cccccc",
+                    "extendedProps": {
+                        "status": "Demo",
+                        "name": "Demo Event"
+                    }
+                })
+                st.info("No actual events available. A demo event has been added for visualization purposes.")
+            
+            # Create a container for the calendar with proper height
+            st.markdown('<div class="calendar-container"></div>', unsafe_allow_html=True)
+            
+            # Display calendar with advanced options within a container
             calendar_options = {
                 "initialView": calendar_view_map[calendar_view],
                 "headerToolbar": {
@@ -516,6 +564,7 @@ elif page == "Lecturer Login":
                     "center": "title",
                     "right": "dayGridMonth,timeGridWeek,timeGridDay"
                 },
+                "plugins": ["dayGrid", "timeGrid"],
                 "slotDuration": "00:30:00",
                 "slotLabelFormat": {
                     "hour": "numeric",
@@ -525,20 +574,84 @@ elif page == "Lecturer Login":
                 },
                 "allDaySlot": False,
                 "nowIndicator": True,
-                "height": "auto"
+                "height": 680,
+                "aspectRatio": 1.8,
+                "contentHeight": 650,
+                "expandRows": True,
+                "stickyHeaderDates": True,
+                "handleWindowResize": True
             }
             
-            # Fix for the calendar display issue - make sure it renders properly
-            st.markdown("""
-            <style>
-            .fc-view-harness {
-                height: 600px !important;
-                min-height: 500px !important;
+            try:
+                calendar(events=all_events, options=calendar_options, key="lecturer_calendar")
+                
+                # Add some space after the calendar
+                st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error loading calendar: {e}")
+                st.info("Please add some student shifts and refreshing the page to see the calendar."): 600px !important;
+            }
+            .fc-scrollgrid-sync-inner {
+                background-color: #f8f9fa;
+            }
+            .fc-col-header-cell {
+                background-color: #0066cc;
+                color: white;
+            }
+            .fc-col-header-cell a {
+                color: white !important;
+                font-weight: bold;
+            }
+            .fc-timegrid-slot {
+                height: 40px !important;
+            }
+            .fc-timegrid-slot-label {
+                font-weight: bold;
+            }
+            .fc-daygrid-day-number {
+                font-weight: bold;
             }
             </style>
             """, unsafe_allow_html=True)
             
-            calendar(events=all_events, options=calendar_options)
+            # Create a placeholder for calendar to ensure it's given proper space
+            calendar_placeholder = st.empty()
+            
+            # Display calendar with advanced options within the placeholder
+            with calendar_placeholder:
+                calendar_options = {
+                    "initialView": calendar_view_map[calendar_view],
+                    "headerToolbar": {
+                        "left": "prev,next today",
+                        "center": "title",
+                        "right": "dayGridMonth,timeGridWeek,timeGridDay"
+                    },
+                    "plugins": ["dayGrid", "timeGrid"],
+                    "slotDuration": "00:30:00",
+                    "slotLabelFormat": {
+                        "hour": "numeric",
+                        "minute": "2-digit",
+                        "omitZeroMinute": False,
+                        "meridiem": "short"
+                    },
+                    "allDaySlot": False,
+                    "nowIndicator": True,
+                    "height": 700,
+                    "aspectRatio": 1.8,
+                    "contentHeight": 650,
+                    "expandRows": True,
+                    "stickyHeaderDates": True,
+                    "handleWindowResize": True
+                }
+                
+                try:
+                    calendar(events=all_events, options=calendar_options, key="lecturer_calendar")
+                    
+                    # Add a message to confirm calendar is working
+                    st.success("Calendar loaded successfully. If you don't see it, please refresh the page.")
+                except Exception as e:
+                    st.error(f"Error loading calendar: {e}")
+                    st.info("Try adding some student shifts and refreshing the page to see the calendar.")
         
         with tab3:
             st.subheader("🌟 SRG STAR Dashboard")
