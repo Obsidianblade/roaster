@@ -71,13 +71,18 @@ elif page == "Student Portal":
             st.subheader("📌 Submitted Shifts")
             st.table(pd.DataFrame(st.session_state.users[st.session_state.current_user]["shifts"]))
 
-        # Show existing shifts in calendar
+        # Student calendar view
         student_data = st.session_state.users[st.session_state.current_user]
         events = [
             {
-                "title": f"{shift['day']} {shift['start']}–{shift['end']} ({shift['status']})",
+                "title": student_data['name'],
                 "start": f"{shift['date']}T{shift['start']}",
-                "end": f"{shift['date']}T{shift['end']}"
+                "end": f"{shift['date']}T{shift['end']}",
+                "extendedProps": {
+                    "status": shift['status'],
+                    "start_time": shift['start'],
+                    "end_time": shift['end']
+                }
             }
             for shift in student_data["shifts"]
         ]
@@ -129,9 +134,14 @@ elif page == "Admin Portal":
         for student_id, data in st.session_state.users.items():
             for shift in data["shifts"]:
                 all_events.append({
-                    "title": f"{data['name']} ({shift['start']}–{shift['end']}) [{shift['status']}]",
+                    "title": data["name"],
                     "start": f"{shift['date']}T{shift['start']}",
-                    "end": f"{shift['date']}T{shift['end']}"
+                    "end": f"{shift['date']}T{shift['end']}",
+                    "extendedProps": {
+                        "status": shift["status"],
+                        "start_time": shift["start"],
+                        "end_time": shift["end"]
+                    }
                 })
         calendar(events=all_events, options={"initialView": "dayGridMonth"})
 
