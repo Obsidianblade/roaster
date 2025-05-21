@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta, time
 from io import BytesIO
 from streamlit_calendar import calendar
@@ -88,6 +90,21 @@ def set_custom_theme():
             border: 1px solid #0066cc !important;
             box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2) !important;
         }
+        
+        /* Certificate styling */
+        .certificate {
+            background: linear-gradient(145deg, #fff8e8, #fffdf5);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+        
+        .certificate h1 {
+            color: #8b4513;
+            font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -105,6 +122,22 @@ def format_time_12hr(time_str):
     time_obj = datetime.strptime(time_str, "%H:%M:%S")
     return time_obj.strftime("%I:%M %p").lstrip("0")
 
+# Function to generate a certificate
+def generate_certificate(student_name, hours_completed, date_completed):
+    certificate_html = f"""
+    <div class="certificate">
+        <h1>Certificate of Achievement</h1>
+        <h2>This is to certify that</h2>
+        <h1>{student_name}</h1>
+        <h2>has successfully completed</h2>
+        <h1>{hours_completed} hours</h1>
+        <h2>of Student Representative Group service</h2>
+        <p>Awarded on {date_completed}</p>
+        <p><strong>SRG Roster Management System</strong></p>
+    </div>
+    """
+    return certificate_html
+
 # Set page configuration
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
 set_custom_theme()
@@ -119,6 +152,10 @@ if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
+if "certificates" not in st.session_state:
+    st.session_state.certificates = {}
+if "default_calendar_view" not in st.session_state:
+    st.session_state.default_calendar_view = "dayGridMonth"
 
 # Status colors for calendar
 status_colors = {
@@ -144,6 +181,8 @@ if page == "Home":
         - Shift management for lecturers
         - Interactive calendar views
         - Downloadable reports
+        - SRG STAR dashboard
+        - Certificate for 30+ hours of service
         
         Choose **Student Portal** or **Lecturer Login** from the sidebar to get started.
         """)
@@ -185,81 +224,185 @@ elif page == "Student Portal":
 
     # Availability section for logged-in users
     if st.session_state.current_user:
-        st.subheader("📅 Enter Weekly Availability")
+        student_tabs = st.tabs(["Submit Availability", "My Schedule", "My Certificate"])
         
-        time_options = get_time_options()
-        today = datetime.today()
-        week_start = today - timedelta(days=today.weekday())
-        shifts = []
-        
-        # Create tabs for each day of the week
-        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        tabs = st.tabs(days)
-        
-        for i, tab in enumerate(tabs):
-            with tab:
-                day = week_start + timedelta(days=i)
-                available = st.checkbox(f"I'm available on {day.strftime('%A (%d %b)')}", key=f"available_{i}", value=True)
-                
-                if available:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        start_time_str = st.selectbox(
-                            f"Start Time", 
-                            options=time_options,
-                            index=time_options.index("9:00 AM") if "9:00 AM" in time_options else 0,
-                            key=f"start_{i}"
-                        )
-                        start_time_obj = datetime.strptime(start_time_str, "%I:%M %p")
-                        start_time = start_time_obj.time()
-                        
-                    with col2:
-                        end_time_str = st.selectbox(
-                            f"End Time", 
-                            options=time_options,
-                            index=time_options.index("5:00 PM") if "5:00 PM" in time_options else 16,
-                            key=f"end_{i}"
-                        )
-                        end_time_obj = datetime.strptime(end_time_str, "%I:%M %p")
-                        end_time = end_time_obj.time()
+        with student_tabs[0]:
+            st.subheader("📅 Enter Weekly Availability")
+            
+            time_options = get_time_options()
+            today = datetime.today()
+            week_start = today - timedelta(days=today.weekday())
+            shifts = []
+            
+            # Create tabs for each day of the week
+            days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            tabs = st.tabs(days)
+            
+            for i, tab in enumerate(tabs):
+                with tab:
+                    day = week_start + timedelta(days=i)
+                    available = st.checkbox(f"I'm available on {day.strftime('%A (%d %b)')}", key=f"available_{i}", value=True)
                     
-                    if start_time < end_time:
-                        shifts.append({
-                            "date": day.strftime("%Y-%m-%d"),
-                            "day": day.strftime("%A"),
-                            "start": start_time.strftime("%H:%M:%S"),
-                            "end": end_time.strftime("%H:%M:%S"),
-                            "start_display": start_time_str,
-                            "end_display": end_time_str,
-                            "status": "To Be Attend"
-                        })
-                    else:
-                        st.warning("End time must be after start time")
+                    if available:
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            start_time_str = st.selectbox(
+                                f"Start Time", 
+                                options=time_options,
+                                index=time_options.index("9:00 AM") if "9:00 AM" in time_options else 0,
+                                key=f"start_{i}"
+                            )
+                            start_time_obj = datetime.strptime(start_time_str, "%I:%M %p")
+                            start_time = start_time_obj.time()
+                            
+                        with col2:
+                            end_time_str = st.selectbox(
+                                f"End Time", 
+                                options=time_options,
+                                index=time_options.index("5:00 PM") if "5:00 PM" in time_options else 16,
+                                key=f"end_{i}"
+                            )
+                            end_time_obj = datetime.strptime(end_time_str, "%I:%M %p")
+                            end_time = end_time_obj.time()
+                        
+                        if start_time < end_time:
+                            shifts.append({
+                                "date": day.strftime("%Y-%m-%d"),
+                                "day": day.strftime("%A"),
+                                "start": start_time.strftime("%H:%M:%S"),
+                                "end": end_time.strftime("%H:%M:%S"),
+                                "start_display": start_time_str,
+                                "end_display": end_time_str,
+                                "status": "To Be Attend"
+                            })
+                        else:
+                            st.warning("End time must be after start time")
 
-        if st.button("Submit Weekly Shifts"):
-            st.session_state.users[st.session_state.current_user]["shifts"] = shifts
-            st.success("Shifts submitted successfully! Your availability has been recorded.")
-
-        # Display calendar for the student
-        student_data = st.session_state.users[st.session_state.current_user]
-        events = [
-            {
-                "title": f"{student_data['name']} ({shift['start_display']} - {shift['end_display']})",
-                "start": f"{shift['date']}T{shift['start']}",
-                "end": f"{shift['date']}T{shift['end']}",
-                "color": status_colors.get(shift["status"], "gray"),
-                "extendedProps": {
-                    "status": shift["status"],
-                    "start_time": shift["start"],
-                    "end_time": shift["end"],
-                    "date": shift["date"]
-                }
-            }
-            for shift in student_data.get("shifts", [])
-        ]
+            if st.button("Submit Weekly Shifts"):
+                # Keep old shifts if they exist
+                old_shifts = st.session_state.users[st.session_state.current_user].get("shifts", [])
+                # Only keep shifts that are not in the current week
+                week_dates = [week_start + timedelta(days=i) for i in range(7)]
+                week_dates_str = [date.strftime("%Y-%m-%d") for date in week_dates]
+                old_shifts = [shift for shift in old_shifts if shift["date"] not in week_dates_str]
+                # Add new shifts
+                new_shifts = old_shifts + shifts
+                st.session_state.users[st.session_state.current_user]["shifts"] = new_shifts
+                st.success("Shifts submitted successfully! Your availability has been recorded.")
         
-        st.subheader("📆 My Schedule")
-        calendar(events=events, options={"initialView": "dayGridMonth"})
+        with student_tabs[1]:
+            st.subheader("📆 My Schedule")
+            
+            # Calendar view options
+            calendar_view = st.radio(
+                "Calendar View", 
+                ["Month", "Week", "Day"], 
+                horizontal=True
+            )
+            
+            # Map the selected view to FullCalendar view options
+            calendar_view_map = {
+                "Month": "dayGridMonth",
+                "Week": "timeGridWeek",
+                "Day": "timeGridDay"
+            }
+            
+            # Display calendar for the student
+            student_data = st.session_state.users[st.session_state.current_user]
+            events = [
+                {
+                    "title": f"{student_data['name']} ({shift['start_display']} - {shift['end_display']})",
+                    "start": f"{shift['date']}T{shift['start']}",
+                    "end": f"{shift['date']}T{shift['end']}",
+                    "color": status_colors.get(shift["status"], "gray"),
+                    "extendedProps": {
+                        "status": shift["status"],
+                        "start_time": shift["start"],
+                        "end_time": shift["end"],
+                        "date": shift["date"]
+                    }
+                }
+                for shift in student_data.get("shifts", [])
+            ]
+            
+            # Calculate total hours
+            total_hours = 0
+            for shift in student_data.get("shifts", []):
+                if shift["status"] == "Confirmed":
+                    start = datetime.strptime(shift["start"], "%H:%M:%S")
+                    end = datetime.strptime(shift["end"], "%H:%M:%S")
+                    hours = (end - start).seconds / 3600
+                    total_hours += hours
+            
+            # Display total hours
+            st.metric("Total Confirmed Hours", f"{total_hours:.2f}")
+            
+            # Display calendar with the selected view
+            calendar_options = {
+                "initialView": calendar_view_map[calendar_view],
+                "headerToolbar": {
+                    "left": "prev,next today",
+                    "center": "title",
+                    "right": "dayGridMonth,timeGridWeek,timeGridDay"
+                },
+                "slotDuration": "00:30:00",
+                "slotLabelFormat": {
+                    "hour": "numeric",
+                    "minute": "2-digit",
+                    "omitZeroMinute": False,
+                    "meridiem": "short"
+                },
+                "allDaySlot": False
+            }
+            
+            calendar(events=events, options=calendar_options)
+        
+        with student_tabs[2]:
+            st.subheader("🏆 My Certificate")
+            
+            # Calculate total hours for the student
+            total_hours = 0
+            for shift in student_data.get("shifts", []):
+                if shift["status"] == "Confirmed":
+                    start = datetime.strptime(shift["start"], "%H:%M:%S")
+                    end = datetime.strptime(shift["end"], "%H:%M:%S")
+                    hours = (end - start).seconds / 3600
+                    total_hours += hours
+            
+            if total_hours >= 30:
+                st.success("Congratulations! You have completed 30+ hours of service and are eligible for a certificate.")
+                
+                # Generate certificate if not already generated
+                student_id = st.session_state.current_user
+                if student_id not in st.session_state.certificates:
+                    date_completed = datetime.now().strftime("%d %B %Y")
+                    st.session_state.certificates[student_id] = {
+                        "name": student_data["name"],
+                        "hours": round(total_hours, 2),
+                        "date": date_completed
+                    }
+                
+                # Display certificate
+                certificate = generate_certificate(
+                    student_data["name"],
+                    round(total_hours, 2),
+                    st.session_state.certificates[student_id]["date"]
+                )
+                st.markdown(certificate, unsafe_allow_html=True)
+                
+                # Button to download as PDF (placeholder - would need additional libraries to actually generate PDF)
+                st.download_button(
+                    label="📥 Download Certificate",
+                    data="Certificate data would go here",
+                    file_name=f"SRG_Certificate_{student_data['name']}.pdf",
+                    mime="application/pdf",
+                    disabled=True,  # Disabled as actual PDF generation is not implemented
+                )
+                st.info("Note: PDF download is a placeholder. In a real app, this would generate an actual PDF file.")
+            else:
+                st.info(f"You have completed {total_hours:.2f} hours. Complete 30 hours to receive a certificate.")
+                # Show progress
+                st.progress(min(total_hours / 30, 1.0))
 
 # Lecturer Login
 elif page == "Lecturer Login":
@@ -291,7 +434,7 @@ elif page == "Lecturer Login":
     # Admin dashboard for logged-in lecturers
     if st.session_state.admin_logged_in:
         # Create tabs for different admin functions
-        tab1, tab2, tab3 = st.tabs(["Manage Shifts", "Calendar View", "Reports"])
+        tab1, tab2, tab3, tab4 = st.tabs(["Manage Shifts", "Calendar View", "SRG STAR Dashboard", "Reports"])
         
         with tab1:
             st.subheader("📋 Manage Student Shifts")
@@ -328,6 +471,21 @@ elif page == "Lecturer Login":
         with tab2:
             st.subheader("📆 Complete Roster Calendar")
             
+            # Calendar view options
+            calendar_view = st.radio(
+                "Calendar View", 
+                ["Month", "Week", "Day"], 
+                horizontal=True,
+                key="lecturer_calendar_view"
+            )
+            
+            # Map the selected view to FullCalendar view options
+            calendar_view_map = {
+                "Month": "dayGridMonth",
+                "Week": "timeGridWeek",
+                "Day": "timeGridDay"
+            }
+            
             # Create events for all students
             all_events = []
             for student_id, data in st.session_state.users.items():
@@ -350,10 +508,110 @@ elif page == "Lecturer Login":
                         }
                     })
             
-            # Display interactive calendar
-            calendar(events=all_events, options={"initialView": "dayGridMonth"})
+            # Display calendar with advanced options
+            calendar_options = {
+                "initialView": calendar_view_map[calendar_view],
+                "headerToolbar": {
+                    "left": "prev,next today",
+                    "center": "title",
+                    "right": "dayGridMonth,timeGridWeek,timeGridDay"
+                },
+                "slotDuration": "00:30:00",
+                "slotLabelFormat": {
+                    "hour": "numeric",
+                    "minute": "2-digit",
+                    "omitZeroMinute": False,
+                    "meridiem": "short"
+                },
+                "allDaySlot": False,
+                "nowIndicator": True,
+                "height": "auto"
+            }
+            
+            # Fix for the calendar display issue - make sure it renders properly
+            st.markdown("""
+            <style>
+            .fc-view-harness {
+                height: 600px !important;
+                min-height: 500px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            calendar(events=all_events, options=calendar_options)
         
         with tab3:
+            st.subheader("🌟 SRG STAR Dashboard")
+            
+            # Calculate hours for each student
+            student_hours = []
+            for student_id, data in st.session_state.users.items():
+                total_hours = 0
+                for shift in data.get("shifts", []):
+                    if shift["status"] == "Confirmed":
+                        start = datetime.strptime(shift["start"], "%H:%M:%S")
+                        end = datetime.strptime(shift["end"], "%H:%M:%S")
+                        hours = (end - start).seconds / 3600
+                        total_hours += hours
+                
+                student_hours.append({
+                    "Student ID": student_id,
+                    "Name": data["name"],
+                    "Total Hours": round(total_hours, 2)
+                })
+            
+            # Create DataFrame and sort by hours
+            df_hours = pd.DataFrame(student_hours)
+            if not df_hours.empty:
+                df_hours = df_hours.sort_values("Total Hours", ascending=False)
+                
+                # Display top students
+                st.subheader("🏆 Top Performing Students")
+                
+                # Create columns for metric display
+                cols = st.columns(min(3, len(df_hours)))
+                for i, col in enumerate(cols):
+                    if i < len(df_hours):
+                        with col:
+                            st.metric(
+                                label=f"{i+1}. {df_hours.iloc[i]['Name']}", 
+                                value=f"{df_hours.iloc[i]['Total Hours']} hours"
+                            )
+                
+                # Create a bar chart
+                fig, ax = plt.subplots(figsize=(10, 6))
+                bars = ax.bar(
+                    df_hours['Name'], 
+                    df_hours['Total Hours'],
+                    color=['#28a745' if i == 0 else '#0066cc' if i == 1 else '#ffc107' if i == 2 else '#6c757d' for i in range(len(df_hours))]
+                )
+                
+                # Add data labels on bars
+                for bar in bars:
+                    height = bar.get_height()
+                    ax.text(
+                        bar.get_x() + bar.get_width()/2.,
+                        height + 0.3,
+                        f'{height:.1f}',
+                        ha='center',
+                        va='bottom',
+                        fontweight='bold'
+                    )
+                
+                ax.set_ylabel('Hours')
+                ax.set_title('Student Hours Completed')
+                plt.xticks(rotation=45, ha='right')
+                plt.tight_layout()
+                
+                st.pyplot(fig)
+                
+                # Display the data table
+                st.subheader("Student Hours Details")
+                st.dataframe(df_hours, use_container_width=True)
+            else:
+                st.info("No student data available yet.")
+        
+        with tab4:
             st.subheader("📊 Weekly Summary Report")
             
             # Create more detailed records for reporting
@@ -385,8 +643,18 @@ elif page == "Lecturer Login":
                 st.dataframe(df_summary, use_container_width=True)
                 
                 # Summary statistics
-                total_hours = df_summary["Hours"].sum()
-                st.metric("Total Confirmed Hours", f"{total_hours:.2f}")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    total_hours = df_summary["Hours"].sum()
+                    st.metric("Total Confirmed Hours", f"{total_hours:.2f}")
+                
+                with col2:
+                    avg_hours = df_summary["Hours"].mean()
+                    st.metric("Average Shift Length", f"{avg_hours:.2f}")
+                
+                with col3:
+                    student_count = df_summary["Student ID"].nunique()
+                    st.metric("Active Students", f"{student_count}")
                 
                 # Create Excel download
                 buffer = BytesIO()
