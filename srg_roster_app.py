@@ -1,7 +1,8 @@
-from io import BytesIO
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
+from io import BytesIO
 from streamlit_calendar import calendar
 
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
@@ -14,6 +15,12 @@ if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
+
+status_colors = {
+    "Confirmed": "green",
+    "Pending": "yellow",
+    "Declined": "red"
+}
 
 if page == "Home":
     st.title("🏫 SRG Roster Management System")
@@ -42,19 +49,22 @@ elif page == "Student Portal":
         for i in range(7):
             day = week_start + timedelta(days=i)
             st.markdown(f"**{day.strftime('%A (%d %b)')}**")
-            col1, col2 = st.columns(2)
-            with col1:
-                start_time = st.time_input(f"Start Time - {day.strftime('%A')}", value=time(9, 0), key=f"start_{i}")
-            with col2:
-                end_time = st.time_input(f"End Time - {day.strftime('%A')}", value=time(17, 0), key=f"end_{i}")
-            if start_time < end_time:
-                shifts.append({
-                    "date": day.strftime("%Y-%m-%d"),
-                    "day": day.strftime("%A"),
-                    "start": str(start_time),
-                    "end": str(end_time),
-                    "status": "Pending"
-                })
+            available = st.checkbox(f"I'm available on {day.strftime('%A')}", key=f"available_{i}", value=True)
+            if available:
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_time = st.time_input(f"Start Time - {day.strftime('%A')}", value=time(9, 0), key=f"start_{i}")
+                with col2:
+                    end_time = st.time_input(f"End Time - {day.strftime('%A')}", value=time(17, 0), key=f"end_{i}")
+                if start_time < end_time:
+                    shifts.append({
+                        "date": day.strftime("%Y-%m-%d"),
+                        "day": day.strftime("%A"),
+                        "start": str(start_time),
+                        "end": str(end_time),
+                        "status": "Pending"
+                    })
+
         if st.button("Submit Weekly Shifts"):
             st.session_state.users[st.session_state.current_user]["shifts"] = shifts
             st.success("Shifts submitted!")
@@ -65,6 +75,7 @@ elif page == "Student Portal":
                 "title": student_data["name"],
                 "start": f"{shift['date']}T{shift['start']}",
                 "end": f"{shift['date']}T{shift['end']}",
+                "color": status_colors.get(shift["status"], "gray"),
                 "extendedProps": {
                     "status": shift["status"],
                     "start_time": shift["start"],
@@ -116,6 +127,7 @@ elif page == "Admin Portal":
                     "title": data["name"],
                     "start": f"{shift['date']}T{shift['start']}",
                     "end": f"{shift['date']}T{shift['end']}",
+                    "color": status_colors.get(shift["status"], "gray"),
                     "extendedProps": {
                         "student_id": student_id,
                         "name": data["name"],
@@ -128,7 +140,6 @@ elif page == "Admin Portal":
         calendar(events=all_events, options={"initialView": "dayGridMonth"})
 
         st.subheader("📊 Weekly Summary Report")
-
         records = []
         for student_id, data in st.session_state.users.items():
             for shift in data["shifts"]:
