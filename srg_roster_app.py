@@ -6,10 +6,8 @@ from streamlit_calendar import calendar
 
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
 st.markdown("""
-    <style>
-       st.markdown("""
-    <style>
-        body {
+    <style> 
+    body {
             background-color: #f4f9ff;
             color: #00274d;
             font-family: 'Segoe UI', sans-serif;
@@ -59,6 +57,9 @@ st.markdown("""
         .block-container {
             padding: 2rem 3rem;
         }
+        st.markdown("""
+        <style>
+
   
 """, unsafe_allow_html=True)
     </style>
