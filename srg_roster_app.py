@@ -7,23 +7,60 @@ from streamlit_calendar import calendar
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
 st.markdown("""
     <style>
-        html, body, [class*="css"]  {
-            background-color: #e6f0ff;
-            color: #003366;
+       st.markdown("""
+    <style>
+        body {
+            background-color: #f4f9ff;
+            color: #00274d;
             font-family: 'Segoe UI', sans-serif;
         }
-        .stButton>button {
-            background-color: #0047ab;
+
+        .stApp {
+            background-color: #f4f9ff;
+        }
+
+        .stButton > button {
+            background: linear-gradient(145deg, #1d4ed8, #3b82f6);
             color: white;
+            border: none;
             border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0,0,255,0.3);
+            padding: 10px 20px;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            font-size: 16px;
         }
-        .stTextInput>div>div>input, .stSelectbox>div>div>div>div, .stTimeInput>div>input {
-            background-color: #ffffff;
-            border: 1px solid #99ccff;
-            border-radius: 10px;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+
+        .stButton > button:hover {
+            background: linear-gradient(145deg, #2563eb, #60a5fa);
+            box-shadow: 0 6px 14px rgba(59, 130, 246, 0.5);
         }
+
+        input, .stSelectbox div div, .stTimeInput input {
+            background-color: #ffffff !important;
+            border: 1px solid #d1e3ff !important;
+            border-radius: 8px !important;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+            padding: 8px;
+        }
+
+        .stSidebar {
+            background: linear-gradient(to bottom, #1e3a8a, #2563eb);
+            color: white;
+        }
+
+        .stSidebar .css-1d391kg, .stSidebar .css-1lcbmhc {
+            color: white;
+        }
+
+        .css-1v3fvcr {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .block-container {
+            padding: 2rem 3rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
     </style>
 """, unsafe_allow_html=True)
 
