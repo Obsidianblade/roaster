@@ -5,6 +5,8 @@ from io import BytesIO
 from streamlit_calendar import calendar
 
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
+
+# Custom CSS for glowing blue/white UI
 st.markdown("""
     <style>
         body {
@@ -45,19 +47,11 @@ st.markdown("""
             color: white;
         }
 
-        .stSidebar .css-1d391kg, .stSidebar .css-1lcbmhc {
-            color: white;
-        }
-
-        .css-1v3fvcr {
-            font-size: 20px;
-            font-weight: bold;
-        }
-
         .block-container {
             padding: 2rem 3rem;
         }
     </style>
+""", unsafe_allow_html=True)
 
 st.sidebar.title("📋 SRG Navigation")
 page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Lecturer Login"])
@@ -83,9 +77,6 @@ def get_rounded_times():
     return times
 
 rounded_times = get_rounded_times()
-
-def format_time(t):
-    return t.strftime("%I:%M %p")
 
 if page == "Home":
     st.title("🏫 SRG Roster Management System")
