@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
@@ -6,6 +5,28 @@ from io import BytesIO
 from streamlit_calendar import calendar
 
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
+st.markdown("""
+    <style>
+        html, body, [class*="css"]  {
+            background-color: #e6f0ff;
+            color: #003366;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .stButton>button {
+            background-color: #0047ab;
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,255,0.3);
+        }
+        .stTextInput>div>div>input, .stSelectbox>div>div>div>div, .stTimeInput>div>input {
+            background-color: #ffffff;
+            border: 1px solid #99ccff;
+            border-radius: 10px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.sidebar.title("📋 SRG Navigation")
 page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Lecturer Login"])
 
@@ -21,6 +42,18 @@ status_colors = {
     "To Be Attend": "yellow",
     "Declined": "red"
 }
+
+def get_rounded_times():
+    times = []
+    for hour in range(6, 22):
+        times.append(time(hour, 0))
+        times.append(time(hour, 30))
+    return times
+
+rounded_times = get_rounded_times()
+
+def format_time(t):
+    return t.strftime("%I:%M %p")
 
 if page == "Home":
     st.title("🏫 SRG Roster Management System")
@@ -60,9 +93,9 @@ elif page == "Student Portal":
             if available:
                 col1, col2 = st.columns(2)
                 with col1:
-                    start_time = st.time_input(f"Start Time - {day.strftime('%A')}", value=time(9, 0), key=f"start_{i}")
+                    start_time = st.selectbox(f"Start Time - {day.strftime('%A')}", options=rounded_times, key=f"start_{i}")
                 with col2:
-                    end_time = st.time_input(f"End Time - {day.strftime('%A')}", value=time(17, 0), key=f"end_{i}")
+                    end_time = st.selectbox(f"End Time - {day.strftime('%A')}", options=rounded_times, key=f"end_{i}")
                 if start_time < end_time:
                     shifts.append({
                         "date": day.strftime("%Y-%m-%d"),
