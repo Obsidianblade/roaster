@@ -165,7 +165,7 @@ elif page == "Admin Portal":
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
                 df_summary.to_excel(writer, index=False, sheet_name="Weekly Summary")
-                writer.save()
+              
                 st.download_button(
                     label="📥 Download Excel Summary",
                     data=buffer.getvalue(),
