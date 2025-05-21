@@ -4,14 +4,88 @@ from datetime import datetime, timedelta, time
 from io import BytesIO
 from streamlit_calendar import calendar
 import base64
+from PIL import Image
+import os
 
-# Custom CSS for blue and white 3D glowing UI
+# Hide streamlit sidebar menu
+st.set_page_config(page_title="SRG Roster Manager", layout="wide", initial_sidebar_state="collapsed")
+
+# Custom CSS for blue and white 3D glowing UI with top navigation
 def set_custom_theme():
     st.markdown("""
     <style>
-        /* Main App Theme */
-        .main, .css-1d391kg {
-            background-color: #f0f8ff;
+        /* Hide sidebar completely */
+        [data-testid="collapsedControl"] {
+            display: none;
+        }
+        
+        /* Hide the default Streamlit hamburger menu and "Deployed from" text */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
+        /* Background image for the entire page */
+        .main {
+            background-image: url("https://raw.githubusercontent.com/yourusername/srg-roster/main/VUCOVER.png");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        
+        /* Add a semi-transparent overlay to improve readability */
+        .main::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.85);
+            z-index: -1;
+        }
+        
+        /* Create top navigation bar */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(90deg, #004c99, #0066cc);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+            margin-bottom: 1rem;
+        }
+        
+        .nav-logo {
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-logo img {
+            height: 40px;
+            margin-right: 10px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.3);
+            font-weight: bold;
         }
         
         /* Headers */
@@ -22,7 +96,7 @@ def set_custom_theme():
         }
         
         /* Cards and containers with 3D effect */
-        .css-1r6slb0, .css-12oz5g7, .stDataFrame, .css-1d391kg, div[data-testid="stForm"] {
+        .css-1r6slb0, .css-12oz5g7, .stDataFrame, div[data-testid="stForm"], .card {
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0, 102, 204, 0.2), 
                         0 0 20px rgba(0, 102, 204, 0.1);
@@ -30,6 +104,17 @@ def set_custom_theme():
             border: 1px solid rgba(0, 102, 204, 0.1);
             padding: 1rem;
             margin: 0.5rem 0;
+        }
+        
+        /* Custom card style */
+        .custom-card {
+            background: linear-gradient(145deg, #ffffff, #f0f8ff);
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.2), 
+                        0 0 20px rgba(0, 102, 204, 0.1);
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border: 1px solid rgba(0, 102, 204, 0.1);
         }
         
         /* Buttons with 3D glowing effect */
@@ -63,20 +148,6 @@ def set_custom_theme():
             box-shadow: 0 4px 10px rgba(40, 167, 69, 0.2);
         }
         
-        /* Sidebar styling */
-        .css-1d391kg, [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #0066cc, #004c99);
-        }
-        
-        [data-testid="stSidebar"] [data-testid="stMarkdown"] {
-            color: white;
-        }
-        
-        [data-testid="stSidebarNav"] {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-        }
-        
         /* Form inputs glow effect */
         input, select, textarea, .stSelectbox > div > div, .stTimeInput > div > div {
             border-radius: 8px !important;
@@ -88,8 +159,94 @@ def set_custom_theme():
             border: 1px solid #0066cc !important;
             box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2) !important;
         }
+        
+        /* Tab styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 1px;
+            background-color: #f0f8ff;
+            border-radius: 8px;
+            padding: 0.5rem;
+            box-shadow: 0 2px 6px rgba(0, 102, 204, 0.1);
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background-color: transparent;
+            color: #0066cc;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            margin-right: 4px;
+        }
+        
+        .stTabs [data-baseweb="tab-panel"] {
+            padding: 1rem;
+            border-radius: 0 0 8px 8px;
+            background-color: #fff;
+            box-shadow: 0 2px 6px rgba(0, 102, 204, 0.1);
+        }
+        
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            background-color: #0066cc;
+            color: white;
+        }
+        
+        /* Fullcalendar styling */
+        .fc .fc-toolbar {
+            background: linear-gradient(90deg, #f0f8ff, #e6f2ff);
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 1rem !important;
+        }
+        
+        .fc .fc-button-primary {
+            background-color: #0066cc !important;
+            border-color: #0052a3 !important;
+            box-shadow: 0 2px 5px rgba(0, 82, 163, 0.3) !important;
+        }
+        
+        .fc-theme-standard td, .fc-theme-standard th {
+            border-color: rgba(0, 102, 204, 0.1) !important;
+        }
+        
+        .fc-daygrid-day-frame {
+            padding: 4px !important;
+        }
+        
+        .fc .fc-daygrid-day.fc-day-today {
+            background-color: rgba(0, 102, 204, 0.1) !important;
+        }
     </style>
     """, unsafe_allow_html=True)
+    
+    # Custom HTML for top navigation
+    logo_html = """
+    <div class="top-nav">
+        <div class="nav-logo">
+            <img src="https://raw.githubusercontent.com/yourusername/srg-roster/main/VU_LOGO.png" alt="VU Logo">
+            <h2 style="color: white; margin: 0;">SRG Roster System</h2>
+        </div>
+        <div class="nav-links">
+            <a href="?page=Home" class="nav-link {home_active}">Home</a>
+            <a href="?page=Student_Portal" class="nav-link {student_active}">Student Portal</a>
+            <a href="?page=Lecturer_Portal" class="nav-link {lecturer_active}">Lecturer Portal</a>
+        </div>
+    </div>
+    """
+    
+    # Determine active page for nav highlighting
+    current_page = st.experimental_get_query_params().get("page", ["Home"])[0]
+    home_active = "active" if current_page == "Home" else ""
+    student_active = "active" if current_page == "Student_Portal" else ""
+    lecturer_active = "active" if current_page == "Lecturer_Portal" else ""
+    
+    # Render the navigation
+    st.markdown(
+        logo_html.format(
+            home_active=home_active,
+            student_active=student_active,
+            lecturer_active=lecturer_active
+        ), 
+        unsafe_allow_html=True
+    )
 
 # Function to create 30-minute interval time options in 12-hour format
 def get_time_options():
@@ -105,12 +262,22 @@ def format_time_12hr(time_str):
     time_obj = datetime.strptime(time_str, "%H:%M:%S")
     return time_obj.strftime("%I:%M %p").lstrip("0")
 
-# Set page configuration
-st.set_page_config(page_title="SRG Roster Manager", layout="wide")
+# Apply custom styling 
 set_custom_theme()
 
-st.sidebar.title("📋 SRG Navigation")
-page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Lecturer Login"])
+# Get the current page from query parameters or use default
+query_params = st.experimental_get_query_params()
+current_page = query_params.get("page", ["Home"])[0]
+
+# Map URL parameter to page name
+page_mapping = {
+    "Home": "Home",
+    "Student_Portal": "Student Portal",
+    "Lecturer_Portal": "Lecturer Login"
+}
+
+# Determine which page to show
+page = page_mapping.get(current_page, "Home")
 
 # Initialize session state variables
 if "users" not in st.session_state:
@@ -131,25 +298,22 @@ status_colors = {
 if page == "Home":
     st.title("🏫 SRG Roster Management System")
     
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("""
-        ### Welcome to the SRG Roster Management System
+    st.markdown("""
+    <div class="custom-card">
+        <h3>Welcome to the SRG Roster Management System</h3>
+        <p>This advanced system helps manage student rosters and shift schedules efficiently.</p>
         
-        This advanced system helps manage student rosters and shift schedules efficiently.
+        <h4>Features:</h4>
+        <ul>
+            <li>Student availability submission</li>
+            <li>Shift management for lecturers</li>
+            <li>Interactive calendar views</li>
+            <li>Downloadable reports</li>
+        </ul>
         
-        #### Features:
-        - Student availability submission
-        - Shift management for lecturers
-        - Interactive calendar views
-        - Downloadable reports
-        
-        Choose **Student Portal** or **Lecturer Login** from the sidebar to get started.
-        """)
-    
-    with col2:
-        st.image("https://via.placeholder.com/400x300?text=SRG+Roster+System", use_column_width=True)
+        <p>Use the navigation menu at the top to get started.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Student Portal
 elif page == "Student Portal":
@@ -162,6 +326,7 @@ elif page == "Student Portal":
             st.session_state.current_user = None
             st.experimental_rerun()
     else:
+        st.markdown("""<div class="custom-card">""", unsafe_allow_html=True)
         with st.form("student_login"):
             st.subheader("Login / Registration")
             col1, col2 = st.columns(2)
@@ -182,9 +347,11 @@ elif page == "Student Portal":
                     st.experimental_rerun()
                 else:
                     st.warning("Enter both ID and Name.")
+        st.markdown("""</div>""", unsafe_allow_html=True)
 
     # Availability section for logged-in users
     if st.session_state.current_user:
+        st.markdown("""<div class="custom-card">""", unsafe_allow_html=True)
         st.subheader("📅 Enter Weekly Availability")
         
         time_options = get_time_options()
@@ -239,8 +406,10 @@ elif page == "Student Portal":
         if st.button("Submit Weekly Shifts"):
             st.session_state.users[st.session_state.current_user]["shifts"] = shifts
             st.success("Shifts submitted successfully! Your availability has been recorded.")
+        st.markdown("""</div>""", unsafe_allow_html=True)
 
         # Display calendar for the student
+        st.markdown("""<div class="custom-card">""", unsafe_allow_html=True)
         student_data = st.session_state.users[st.session_state.current_user]
         events = [
             {
@@ -260,6 +429,7 @@ elif page == "Student Portal":
         
         st.subheader("📆 My Schedule")
         calendar(events=events, options={"initialView": "dayGridMonth"})
+        st.markdown("""</div>""", unsafe_allow_html=True)
 
 # Lecturer Login
 elif page == "Lecturer Login":
