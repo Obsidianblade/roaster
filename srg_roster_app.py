@@ -3,126 +3,99 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
 
-# Setup
-st.set_page_config(page_title="SRG Roster Manager", layout="wide")
-st.sidebar.title("📋 SRG Navigation")
-page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Admin Portal"])
+st.set_page_config(page_title="SRG Calendar View", layout="wide")
 
-# Global state init
+# Constants
+DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+HOURS = list(range(9, 18))  # 9AM–5PM
+
+# Initialize state
 if "users" not in st.session_state:
-    st.session_state.users = {}  # Format: {student_id: {"name": ..., "shifts": []}}
+    st.session_state.users = {}
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
-# Page 1: Home
-if page == "Home":
-    st.title("🏫 SRG Roster Management System")
-    st.markdown("Welcome to the Student Roster Management System. Please choose **Student Portal** or **Admin Portal** from the left sidebar.")
+# Sidebar login
+st.sidebar.title("SRG Login")
+role = st.sidebar.radio("Login as", ["Student", "Admin"])
 
-# Page 2: Student Portal
-elif page == "Student Portal":
-    st.title("🧑‍🎓 Student Login / Registration")
-    with st.form("student_login"):
-        student_id = st.text_input("Student ID")
-        student_name = st.text_input("Full Name")
-        submitted = st.form_submit_button("Login / Register")
+if role == "Student":
+    sid = st.sidebar.text_input("Student ID")
+    name = st.sidebar.text_input("Full Name")
+    if st.sidebar.button("Login / Register"):
+        if sid and name:
+            st.session_state.current_user = sid
+            if sid not in st.session_state.users:
+                st.session_state.users[sid] = {"name": name, "grid": {}}
+            st.success(f"Logged in as {name}")
 
-        if submitted:
-            if student_id and student_name:
-                st.session_state.current_user = student_id
-                if student_id not in st.session_state.users:
-                    st.session_state.users[student_id] = {"name": student_name, "shifts": []}
-                st.success(f"Logged in as {student_name} (ID: {student_id})")
+elif role == "Admin":
+    user = st.sidebar.text_input("Username")
+    pwd = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if user == "demo" and pwd == "demo":
+            st.session_state.admin_logged_in = True
+            st.success("Admin logged in")
+
+# STUDENT VIEW
+if st.session_state.current_user:
+    sid = st.session_state.current_user
+    student = st.session_state.users[sid]
+    st.title(f"🧑‍🎓 Weekly Shift Calendar - {student['name']}")
+
+    for hour in HOURS:
+        cols = st.columns(len(DAYS))
+        for i, day in enumerate(DAYS):
+            key = (day, hour)
+            cell_key = f"{sid}_{day}_{hour}"
+            current_status = student["grid"].get(key, "None")
+
+            if current_status == "Confirmed":
+                cols[i].success("✔️ Confirmed")
+            elif current_status == "Pending":
+                if cols[i].button("🟨 Cancel", key=cell_key):
+                    del student["grid"][key]
+                else:
+                    cols[i].info("⏳ Pending")
             else:
-                st.warning("Please enter both ID and name.")
+                if cols[i].button(f"{hour}:00", key=cell_key):
+                    student["grid"][key] = "Pending"
 
-    if st.session_state.current_user:
-        st.subheader("📅 Enter Your Weekly Availability with Time")
-        today = datetime.today()
-        week_start = today - timedelta(days=today.weekday())
-        shifts = []
+# ADMIN VIEW
+elif st.session_state.admin_logged_in:
+    st.title("🧑‍🏫 Admin Calendar View")
 
-        for i in range(7):
-            day = week_start + timedelta(days=i)
-            st.markdown(f"**{day.strftime('%A (%d %b)')}**")
-            col1, col2 = st.columns(2)
-            with col1:
-                start_time = st.time_input(f"Start Time - {day.strftime('%A')}", value=time(9, 0), key=f"start_{i}")
-            with col2:
-                end_time = st.time_input(f"End Time - {day.strftime('%A')}", value=time(17, 0), key=f"end_{i}")
-            if start_time < end_time:
-                shifts.append({
-                    "date": day.strftime("%Y-%m-%d"),
-                    "day": day.strftime("%A"),
-                    "start": str(start_time),
-                    "end": str(end_time),
-                    "status": "Pending"
-                })
+    search = st.text_input("Search student by name")
+    filtered = {sid: data for sid, data in st.session_state.users.items() if search.lower() in data["name"].lower()}
 
-        if st.button("Submit Weekly Shifts"):
-            st.session_state.users[st.session_state.current_user]["shifts"] = shifts
-            st.success("✅ Shifts submitted successfully!")
+    for sid, data in filtered.items():
+        st.subheader(f"{data['name']} (ID: {sid})")
+        for hour in HOURS:
+            cols = st.columns(len(DAYS))
+            for i, day in enumerate(DAYS):
+                key = (day, hour)
+                cell_key = f"admin_{sid}_{day}_{hour}"
+                current = data["grid"].get(key, "None")
 
-        # Show existing shifts
-        if st.session_state.users[st.session_state.current_user]["shifts"]:
-            st.subheader("📌 Submitted Shifts")
-            st.table(pd.DataFrame(st.session_state.users[st.session_state.current_user]["shifts"]))
+                if current == "Pending":
+                    if cols[i].button("✔️ Approve", key=cell_key):
+                        data["grid"][key] = "Confirmed"
+                elif current == "Confirmed":
+                    cols[i].success("✔️ Confirmed")
+                else:
+                    cols[i].write("—")
 
-# Page 3: Admin Portal
-elif page == "Admin Portal":
-    st.title("🧑‍💼 Admin Login")
-    if not st.session_state.admin_logged_in:
-        admin_user = st.text_input("Username")
-        admin_pass = st.text_input("Password", type="password")
-        if st.button("Login"):
-            if admin_user == "demo" and admin_pass == "demo":
-                st.session_state.admin_logged_in = True
-                st.success("✅ Logged in as Admin")
-            else:
-                st.error("❌ Invalid credentials")
+    # Summary table
+    st.subheader("📊 Weekly Confirmed Hours Summary")
+    summary = []
+    for sid, data in st.session_state.users.items():
+        confirmed_hours = sum(1 for v in data["grid"].values() if v == "Confirmed")
+        summary.append({
+            "Student ID": sid,
+            "Name": data["name"],
+            "Confirmed Hours": confirmed_hours
+        })
 
-    if st.session_state.admin_logged_in:
-        st.subheader("📋 All Student Shifts")
-        for student_id, data in st.session_state.users.items():
-            st.markdown(f"### {data['name']} (ID: {student_id})")
-            if isinstance(data["shifts"], list) and data["shifts"]:
-                df = pd.DataFrame(data["shifts"])
-                for i in range(len(df)):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(f"**{df.loc[i, 'day']} - {df.loc[i, 'date']}**: {df.loc[i, 'start']} to {df.loc[i, 'end']}")
-                    with col2:
-                        color_label = {
-                            "Pending": "🟨 Pending",
-                            "Confirmed": "🟩 Confirmed",
-                            "Declined": "🟥 Declined"
-                        }
-                        new_status = st.selectbox("Status", ["Pending", "Confirmed", "Declined"],
-                                                  index=["Pending", "Confirmed", "Declined"].index(df.loc[i, "status"]),
-                                                  key=f"status_{student_id}_{i}",
-                                                  format_func=lambda x: color_label[x])
-                        df.at[i, "status"] = new_status
-                st.session_state.users[student_id]["shifts"] = df.to_dict(orient="records")
-                st.markdown("---")
-            else:
-                st.info("No shifts submitted.")
-
-        st.subheader("📊 Weekly Summary Report")
-        summary = []
-        for student_id, data in st.session_state.users.items():
-            total_hours = 0
-            for shift in data["shifts"]:
-                if shift["status"] == "Confirmed":
-                    start = datetime.strptime(shift["start"], "%H:%M:%S")
-                    end = datetime.strptime(shift["end"], "%H:%M:%S")
-                    hours = (end - start).seconds / 3600
-                    total_hours += hours
-            summary.append({
-                "Student ID": student_id,
-                "Name": data["name"],
-                "Confirmed Hours": total_hours
-            })
-
-        st.table(pd.DataFrame(summary))
+    st.table(pd.DataFrame(summary))
