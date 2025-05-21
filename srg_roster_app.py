@@ -154,14 +154,54 @@ elif page == "Lecturer Portal":
                                   })
         calendar(events=all_events, options={"initialView":"dayGridMonth"})
         # Reports
-        df = pd.DataFrame([{
-            "Student": data['name'],
-            "Date": sh['date'],
-            "Time": sh['display'],
-            "Status": sh['status']
-        } for sid,data in st.session_state.users.items() for sh in data.get('shifts',[]) if sh['status']=='Confirmed'])
-        if not df.empty:
-            st.subheader("📊 Confirmed Shifts Report")
-            st.dataframe(df, use_container_width=True)
-            buf=BytesIO(); with pd.ExcelWriter(buf, engine="xlsxwriter") as w: df.to_excel(w, index=False)
-            st.download_button("Download Excel", buf.getvalue(), "report.xlsx", "application/vnd.ms-excel")
+        with tab3:
+    st.subheader("📊 Confirmed Shifts Report")
+    
+    # Build the DataFrame of confirmed shifts
+    df = pd.DataFrame([{
+        "Student ID": sid,
+        "Name": data["name"],
+        "Date": datetime.strptime(sh["date"], "%Y-%m-%d").strftime("%d %b %Y"),
+        "Day": sh["day"],
+        "Start Time": sh["display"].split("–")[0],
+        "End Time": sh["display"].split("–")[1],
+        "Status": sh["status"],
+        "Hours": round((datetime.strptime(sh["end"], "%H:%M:%S") - 
+                        datetime.strptime(sh["start"], "%H:%M:%S")
+                       ).seconds / 3600, 2)
+    } for sid, data in st.session_state.users.items() 
+      for sh in data.get("shifts", []) 
+      if sh["status"] == "Confirmed"])
+    
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+        
+        # Total hours metric
+        total_hours = df["Hours"].sum()
+        st.metric("Total Confirmed Hours", f"{total_hours:.2f}")
+        
+        # Prepare Excel download
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Weekly Summary")
+            workbook  = writer.book
+            worksheet = writer.sheets["Weekly Summary"]
+            
+            # Format header row
+            header_fmt = workbook.add_format({
+                "bold": True,
+                "bg_color": "#0066cc",
+                "font_color": "white",
+                "border": 1
+            })
+            for col_num, col_name in enumerate(df.columns):
+                worksheet.write(0, col_num, col_name, header_fmt)
+        
+        st.download_button(
+            label="📥 Download Excel Summary",
+            data=buf.getvalue(),
+            file_name="SRG_weekly_summary.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.info("No confirmed shifts to display in the report.")
