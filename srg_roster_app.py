@@ -7,7 +7,7 @@ from streamlit_calendar import calendar
 
 st.set_page_config(page_title="SRG Roster Manager", layout="wide")
 st.sidebar.title("📋 SRG Navigation")
-page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Admin Portal"])
+page = st.sidebar.selectbox("Go to", ["Home", "Student Portal", "Lecturer Login"])
 
 if "users" not in st.session_state:
     st.session_state.users = {}
@@ -18,28 +18,35 @@ if "current_user" not in st.session_state:
 
 status_colors = {
     "Confirmed": "green",
-    "Pending": "yellow",
+    "To Be Attend": "yellow",
     "Declined": "red"
 }
 
 if page == "Home":
     st.title("🏫 SRG Roster Management System")
-    st.markdown("Choose **Student Portal** or **Admin Portal** from the sidebar.")
+    st.markdown("Choose **Student Portal** or **Lecturer Login** from the sidebar.")
 
 elif page == "Student Portal":
     st.title("🧑‍🎓 Student Login / Registration")
-    with st.form("student_login"):
-        student_id = st.text_input("Student ID")
-        student_name = st.text_input("Full Name")
-        submitted = st.form_submit_button("Login / Register")
-        if submitted:
-            if student_id and student_name:
-                st.session_state.current_user = student_id
-                if student_id not in st.session_state.users:
-                    st.session_state.users[student_id] = {"name": student_name, "shifts": []}
-                st.success(f"Logged in as {student_name}")
-            else:
-                st.warning("Enter both ID and Name.")
+    if st.session_state.current_user:
+        st.success(f"Logged in as {st.session_state.users[st.session_state.current_user]['name']}")
+        if st.button("Logout"):
+            st.session_state.current_user = None
+            st.experimental_rerun()
+    else:
+        with st.form("student_login"):
+            student_id = st.text_input("Student ID")
+            student_name = st.text_input("Full Name")
+            submitted = st.form_submit_button("Login / Register")
+            if submitted:
+                if student_id and student_name:
+                    st.session_state.current_user = student_id
+                    if student_id not in st.session_state.users:
+                        st.session_state.users[student_id] = {"name": student_name, "shifts": []}
+                    st.success(f"Logged in as {student_name}")
+                    st.experimental_rerun()
+                else:
+                    st.warning("Enter both ID and Name.")
 
     if st.session_state.current_user:
         st.subheader("📅 Enter Weekly Availability")
@@ -62,7 +69,7 @@ elif page == "Student Portal":
                         "day": day.strftime("%A"),
                         "start": str(start_time),
                         "end": str(end_time),
-                        "status": "Pending"
+                        "status": "To Be Attend"
                     })
 
         if st.button("Submit Weekly Shifts"):
@@ -88,17 +95,22 @@ elif page == "Student Portal":
         st.subheader("📆 My Calendar View")
         calendar(events=events, options={"initialView": "dayGridMonth"})
 
-elif page == "Admin Portal":
-    st.title("🧑‍💼 Admin Login")
+elif page == "Lecturer Login":
+    st.title("👩‍🏫 Lecturer Login")
     if not st.session_state.admin_logged_in:
         admin_user = st.text_input("Username")
         admin_pass = st.text_input("Password", type="password")
         if st.button("Login"):
             if admin_user == "demo" and admin_pass == "demo":
                 st.session_state.admin_logged_in = True
-                st.success("Admin logged in")
+                st.success("Lecturer logged in")
+                st.experimental_rerun()
             else:
                 st.error("Invalid credentials")
+    else:
+        if st.button("Logout"):
+            st.session_state.admin_logged_in = False
+            st.experimental_rerun()
 
     if st.session_state.admin_logged_in:
         st.subheader("📋 Manage Shifts")
@@ -111,8 +123,8 @@ elif page == "Admin Portal":
                     with col1:
                         st.markdown(f"{df.loc[i, 'day']} - {df.loc[i, 'date']}: {df.loc[i, 'start']} to {df.loc[i, 'end']}")
                     with col2:
-                        new_status = st.selectbox("Status", ["Pending", "Confirmed", "Declined"],
-                            index=["Pending", "Confirmed", "Declined"].index(df.loc[i, "status"]),
+                        new_status = st.selectbox("Status", ["To Be Attend", "Confirmed", "Declined"],
+                            index=["To Be Attend", "Confirmed", "Declined"].index(df.loc[i, "status"]),
                             key=f"status_{student_id}_{i}")
                         df.at[i, "status"] = new_status
                 st.session_state.users[student_id]["shifts"] = df.to_dict(orient="records")
@@ -165,10 +177,9 @@ elif page == "Admin Portal":
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
                 df_summary.to_excel(writer, index=False, sheet_name="Weekly Summary")
-              
-                st.download_button(
-                    label="📥 Download Excel Summary",
-                    data=buffer.getvalue(),
-                    file_name="weekly_summary.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.download_button(
+                label="📥 Download Excel Summary",
+                data=buffer.getvalue(),
+                file_name="weekly_summary.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
