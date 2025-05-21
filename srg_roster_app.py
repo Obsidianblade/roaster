@@ -19,6 +19,7 @@ def set_background(image_path):
         </style>
     """, unsafe_allow_html=True)
 
+
 def set_header_nav(logo_path):
     """Display logo and horizontal navigation, return selected page."""
     col_logo, col_nav = st.columns([1, 4], gap="small")
@@ -27,6 +28,7 @@ def set_header_nav(logo_path):
     with col_nav:
         page = st.radio("", ["Home", "Student Portal", "Lecturer Portal"], horizontal=True)
     return page
+
 
 def get_time_options():
     """Return 30-minute interval times in 12-hour format."""
@@ -86,6 +88,7 @@ if page == "Home":
 # --- Student Portal ---
 elif page == "Student Portal":
     st.title("🧑‍🎓 Student Portal")
+    # Login / Logout
     if st.session_state.current_user:
         st.success(f"Logged in as {st.session_state.users[st.session_state.current_user]['name']}")
         if st.button("Logout"):
@@ -104,6 +107,7 @@ elif page == "Student Portal":
                     st.experimental_rerun()
                 else:
                     st.warning("Enter both ID and Name.")
+    # Availability & Submit
     if st.session_state.current_user:
         st.subheader("📅 Enter Weekly Availability")
         today = datetime.today()
@@ -121,15 +125,28 @@ elif page == "Student Portal":
                 s = datetime.strptime(st.session_state[f"start_{i}"], "%I:%M %p").time()
                 e = datetime.strptime(st.session_state[f"end_{i}"], "%I:%M %p").time()
                 if s < e:
-                    shifts.append({"date": day.strftime("%Y-%m-%d"), "day": day.strftime("%A"), "start": s.strftime("%H:%M:%S"), "end": e.strftime("%H:%M:%S"), "display": f"{st.session_state[f'start_{i}']}–{st.session_state[f'end_{i}']}", "status": "To Be Attend"})
+                    shifts.append({
+                        "date": day.strftime("%Y-%m-%d"),
+                        "day": day.strftime("%A"),
+                        "start": s.strftime("%H:%M:%S"),
+                        "end": e.strftime("%H:%M:%S"),
+                        "display": f"{st.session_state[f'start_{i}']}–{st.session_state[f'end_{i}']}",
+                        "status": "To Be Attend"
+                    })
                 else:
                     st.warning("End time must be after start time")
         if st.button("Submit Shifts"):
             st.session_state.users[st.session_state.current_user]["shifts"] = shifts
             st.success("Submitted!")
-        # Student calendar
+        # Student Calendar View
         events = [
-            {"title": st.session_state.users[st.session_state.current_user]["name"], "start": f"{sh['date']}T{sh['start']}", "end": f"{sh['date']}T{sh['end']}", "color": status_colors[sh['status']]} for sh in st.session_state.users[st.session_state.current_user]["shifts"]
+            {
+                "title": st.session_state.users[st.session_state.current_user]["name"],
+                "start": f"{sh['date']}T{sh['start']}",
+                "end":   f"{sh['date']}T{sh['end']}",
+                "color": status_colors[sh['status']]
+            }
+            for sh in st.session_state.users[st.session_state.current_user]["shifts"]
         ]
         st.subheader("📆 My Schedule")
         calendar(events=events, options={"initialView": "dayGridWeek"})
@@ -137,6 +154,7 @@ elif page == "Student Portal":
 # --- Lecturer Portal ---
 elif page == "Lecturer Portal":
     st.title("👩‍🏫 Lecturer Portal")
+    # Login / Logout
     if not st.session_state.admin_logged_in:
         user = st.text_input("Username", key="admin_user")
         pwd  = st.text_input("Password", type="password", key="admin_pass")
@@ -152,7 +170,7 @@ elif page == "Lecturer Portal":
             st.session_state.admin_logged_in = False
             st.experimental_rerun()
 
-        # Tabs
+        # Lecturer Tabs
         tab1, tab2, tab3 = st.tabs(["Manage Shifts","Calendar View","Reports"])
 
         with tab1:
@@ -164,12 +182,17 @@ elif page == "Lecturer Portal":
                         for i in range(len(df)):
                             col1, col2, col3 = st.columns([2,2,1])
                             with col1:
-                                date_fmt = datetime.strptime(df.loc[i,"date"],"%Y-%m-%d").strftime("%d %b %Y")
-                                st.write(f"**{df.loc[i,'day']} ({date_fmt})**")
+                                df_date = datetime.strptime(df.loc[i,"date"],"%Y-%m-%d").strftime("%d %b %Y")
+                                st.write(f"**{df.loc[i,'day']} ({df_date})**")
                             with col2:
                                 st.write(df.loc[i,'display'])
                             with col3:
-                                new_status = st.selectbox("Status", ["To Be Attend","Confirmed","Declined"], index=["To Be Attend","Confirmed","Declined"].index(df.loc[i,"status"]), key=f"status_{sid}_{i}")
+                                new_status = st.selectbox(
+                                    "Status",
+                                    ["To Be Attend","Confirmed","Declined"],
+                                    index=["To Be Attend","Confirmed","Declined"].index(df.loc[i,"status"]),
+                                    key=f"status_{sid}_{i}"
+                                )
                                 df.at[i,"status"] = new_status
                         st.session_state.users[sid]["shifts"] = df.to_dict("records")
                     else:
@@ -184,11 +207,9 @@ elif page == "Lecturer Portal":
                         "title": f"{data['name']} ({sh['display']})",
                         "start": f"{sh['date']}T{sh['start']}",
                         "end":   f"{sh['date']}T{sh['end']}",
-                        "color": status_colors[sh['status']]})
-            # Wrap calendar in white container for visibility
-            st.markdown('<div style="background: rgba(255,255,255,0.9); padding: 1rem; border-radius: 8px;">', unsafe_allow_html=True)
-            calendar(events=all_events, options={"initialView":"dayGridMonth"})
-            st.markdown('</div>', unsafe_allow_html=True)
+                        "color": status_colors[sh['status']]
+                    })
+            calendar(events=all_events, options={"initialView": "dayGridMonth"})
 
         with tab3:
             st.subheader("📊 Confirmed Shifts Report")
